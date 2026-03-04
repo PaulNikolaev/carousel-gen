@@ -1,5 +1,6 @@
 """Data access layer."""
 
 from app.repositories.carousel_repository import CarouselRepository
+from app.repositories.slide_repository import SlideRepository
 
-__all__ = ["CarouselRepository"]
+__all__ = ["CarouselRepository", "SlideRepository"]

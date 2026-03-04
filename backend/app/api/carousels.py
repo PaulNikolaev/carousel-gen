@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.slides import router as slides_router
 from app.core.database import get_db
 from app.models.enums import CarouselStatusEnum
 from app.schemas.carousel import (
@@ -16,6 +17,7 @@ from app.schemas.carousel import (
 from app.services.carousel_service import CarouselService
 
 router = APIRouter(prefix="/carousels", tags=["carousels"])
+router.include_router(slides_router, prefix="/{carousel_id:uuid}/slides")
 
 
 def _get_service(session: AsyncSession = Depends(get_db)) -> CarouselService:

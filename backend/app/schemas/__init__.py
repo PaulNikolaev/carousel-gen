@@ -7,6 +7,7 @@ from app.schemas.carousel import (
     CarouselUpdate,
     FormatSchema,
 )
+from app.schemas.slide import SlideResponse, SlideUpdate
 
 __all__ = [
     "CarouselCreate",
@@ -14,4 +15,6 @@ __all__ = [
     "CarouselResponse",
     "CarouselUpdate",
     "FormatSchema",
+    "SlideResponse",
+    "SlideUpdate",
 ]
