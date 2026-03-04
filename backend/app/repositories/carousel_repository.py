@@ -45,6 +45,12 @@ class CarouselRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_id_for_update(self, carousel_id: UUID) -> Carousel | None:
+        result = await self._session.execute(
+            select(Carousel).where(Carousel.id == carousel_id).with_for_update()
+        )
+        return result.scalar_one_or_none()
+
     async def list(
         self,
         *,
@@ -73,11 +79,14 @@ class CarouselRepository:
         *,
         title: str | None = None,
         format: dict | None = None,
+        status: CarouselStatusEnum | None = None,
     ) -> Carousel:
         if title is not None:
             carousel.title = title
         if format is not None:
             carousel.format = format
+        if status is not None:
+            carousel.status = status
         await self._session.flush()
         await self._session.refresh(carousel)
         return carousel

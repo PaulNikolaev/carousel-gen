@@ -1,11 +1,21 @@
 """Async data access for Slide model."""
 
+from typing import TypedDict
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.slide import Slide
+
+
+class SlideData(TypedDict):
+    """Input for creating a slide row."""
+
+    order: int
+    title: str
+    body: str
+    footer: str
 
 
 class SlideRepository:
@@ -23,6 +33,29 @@ class SlideRepository:
     async def get_by_id(self, slide_id: UUID) -> Slide | None:
         result = await self._session.execute(select(Slide).where(Slide.id == slide_id))
         return result.scalar_one_or_none()
+
+    async def delete_by_carousel_id(self, carousel_id: UUID) -> None:
+        await self._session.execute(delete(Slide).where(Slide.carousel_id == carousel_id))
+
+    async def create_for_carousel(
+        self, carousel_id: UUID, items: list[SlideData]
+    ) -> list[Slide]:
+        slides = [
+            Slide(
+                carousel_id=carousel_id,
+                order=item["order"],
+                title=item["title"],
+                body=item["body"],
+                footer=item["footer"],
+            )
+            for item in items
+        ]
+        for s in slides:
+            self._session.add(s)
+        await self._session.flush()
+        for s in slides:
+            await self._session.refresh(s)
+        return slides
 
     async def update(
         self,

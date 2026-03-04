@@ -38,7 +38,7 @@ class Generation(Base):
     )
     tokens_estimate: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default=text("0"))
     tokens_used: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    result: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    result: Mapped[list | dict | None] = mapped_column(JSONB, nullable=True)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default=text("1"))
     created_at: Mapped[datetime] = mapped_column(

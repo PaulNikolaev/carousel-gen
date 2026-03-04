@@ -24,7 +24,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    entrypoint: ["sh", "-c", "alembic upgrade head && exec python -m pytest tests -v"]
+    entrypoint: ["sh", "-c", "alembic upgrade head && exec \"$@\""]
+    command: ["python", "-m", "pytest", "tests", "-v"]
 
 volumes:
   postgres_test_data:
