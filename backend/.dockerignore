@@ -1,4 +1,5 @@
 .env
+.env.test
 .git
 __pycache__
 *.pyc
@@ -8,7 +9,6 @@ htmlcov
 *.egg-info
 .venv
 venv
-tests/
 .mypy_cache/
 dist/
 .ruff_cache/
