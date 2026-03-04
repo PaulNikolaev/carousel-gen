@@ -15,10 +15,9 @@ config = context.config
 if config.config_file_name:
     fileConfig(config.config_file_name)
 
-# TODO: replace None with Base.metadata once models are defined
-# from app.db.base import Base
-# target_metadata = Base.metadata
-target_metadata = None
+from app.models import Base
+
+target_metadata = Base.metadata
 
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
@@ -32,6 +31,7 @@ def do_run_migrations(connection: Connection) -> None:
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
+    url = url.replace("+asyncpg", "", 1) if url else url
     context.configure(
         url=url,
         target_metadata=target_metadata,
