@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     LLM_BASE_URL: str = ""
     LLM_MODEL: str = ""
 
+    PREVIEW_BASE_URL: str = "http://localhost:8000"
+    CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+
 
 @lru_cache
 def get_settings() -> Settings:

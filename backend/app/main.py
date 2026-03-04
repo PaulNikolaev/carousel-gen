@@ -1,9 +1,33 @@
-import os
-
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.api import api_router
+from app.core.config import get_settings
+
+
+def _error_response(detail: str | list, code: int) -> JSONResponse:
+    return JSONResponse(
+        status_code=code,
+        content={"detail": detail, "code": code},
+    )
+
+
+async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    if isinstance(exc, HTTPException):
+        return _error_response(
+            detail=exc.detail if isinstance(exc.detail, (str, list)) else str(exc.detail),
+            code=exc.status_code,
+        )
+    raise exc
+
+
+async def validation_exception_handler(
+    request: Request, exc: RequestValidationError
+) -> JSONResponse:
+    return _error_response(detail=exc.errors(), code=422)
+
 
 app = FastAPI(
     title="Carousel Generator API",
@@ -11,8 +35,11 @@ app = FastAPI(
     description="API для генерации LinkedIn-каруселей.",
 )
 
-_raw_origins = os.getenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
-_allowed_origins = [o.strip() for o in _raw_origins.split(",") if o.strip()]
+_allowed_origins = [
+    o.strip()
+    for o in get_settings().CORS_ALLOWED_ORIGINS.split(",")
+    if o.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,5 +48,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
 
 app.include_router(api_router)
