@@ -15,6 +15,7 @@ from app.models.enums import CarouselStatusEnum, SourceTypeEnum
 
 if TYPE_CHECKING:
     from app.models.carousel_design import CarouselDesign
+    from app.models.generation import Generation
     from app.models.slide import Slide
 
 
@@ -60,6 +61,11 @@ class Carousel(Base):
         "Slide",
         back_populates="carousel",
         order_by="Slide.order",
+        cascade="all, delete-orphan",
+    )
+    generations: Mapped[list[Generation]] = relationship(
+        "Generation",
+        back_populates="carousel",
         cascade="all, delete-orphan",
     )
     design: Mapped[CarouselDesign | None] = relationship(

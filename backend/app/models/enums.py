@@ -25,3 +25,10 @@ class TemplateEnum(str, enum.Enum):
 class BackgroundTypeEnum(str, enum.Enum):
     color = "color"
     image = "image"
+
+
+class GenerationStatusEnum(str, enum.Enum):
+    queued = "queued"
+    running = "running"
+    done = "done"
+    failed = "failed"

@@ -22,7 +22,7 @@ def upgrade() -> None:
     source_type_enum = postgresql.ENUM(
         "text", "video", "links", name="source_type_enum", create_type=True
     )
-    source_type_enum.create(op.get_context().bind, checkfirst=True)
+    source_type_enum.create(op.get_bind(), checkfirst=True)
     source_type_enum_col = postgresql.ENUM(
         "text", "video", "links", name="source_type_enum", create_type=False
     )
@@ -31,7 +31,7 @@ def upgrade() -> None:
         "draft", "generating", "ready", "failed",
         name="carousel_status_enum", create_type=True
     )
-    carousel_status_enum.create(op.get_context().bind, checkfirst=True)
+    carousel_status_enum.create(op.get_bind(), checkfirst=True)
     carousel_status_enum_col = postgresql.ENUM(
         "draft", "generating", "ready", "failed",
         name="carousel_status_enum", create_type=False
@@ -70,7 +70,7 @@ def upgrade() -> None:
     template_enum = postgresql.ENUM(
         "classic", "bold", "minimal", name="template_enum", create_type=True
     )
-    template_enum.create(op.get_context().bind, checkfirst=True)
+    template_enum.create(op.get_bind(), checkfirst=True)
     template_enum_col = postgresql.ENUM(
         "classic", "bold", "minimal", name="template_enum", create_type=False
     )
@@ -78,7 +78,7 @@ def upgrade() -> None:
     background_type_enum = postgresql.ENUM(
         "color", "image", name="background_type_enum", create_type=True
     )
-    background_type_enum.create(op.get_context().bind, checkfirst=True)
+    background_type_enum.create(op.get_bind(), checkfirst=True)
     background_type_enum_col = postgresql.ENUM(
         "color", "image", name="background_type_enum", create_type=False
     )
