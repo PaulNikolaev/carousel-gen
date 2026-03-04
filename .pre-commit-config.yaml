@@ -1,0 +1,21 @@
+# Pre-commit: lint and format before commit
+# Install: pip install pre-commit && pre-commit install
+# Run on all: pre-commit run --all-files
+
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
+    hooks:
+      - id: ruff
+        name: ruff check
+        args: [--config=backend/ruff.toml, --fix]
+        files: ^backend/.*\.py$
+      - id: ruff-format
+        name: ruff format
+        args: [--config=backend/ruff.toml]
+        files: ^backend/.*\.py$
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace

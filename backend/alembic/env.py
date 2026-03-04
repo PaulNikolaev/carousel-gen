@@ -44,7 +44,6 @@ def run_migrations_offline() -> None:
 
 async def run_async_migrations() -> None:
     section = config.get_section(config.config_ini_section, {})
-    section["url"] = settings.DATABASE_URL
     connectable = async_engine_from_config(
         section,
         prefix="sqlalchemy.",
