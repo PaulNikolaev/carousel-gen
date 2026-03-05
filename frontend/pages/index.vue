@@ -6,18 +6,40 @@
       </h1>
       <NuxtLink
         to="/create"
-        class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
+        class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        aria-label="Создать новую карусель"
       >
         Создать карусель
       </NuxtLink>
     </div>
 
-    <div v-if="pending && !items.length" class="text-gray-500">
-      Загрузка…
+    <div
+      v-if="pending && !items.length"
+      role="status"
+      aria-label="Загрузка списка каруселей"
+      class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3"
+    >
+      <div
+        v-for="i in 3"
+        :key="i"
+        class="flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm"
+      >
+        <div class="aspect-[4/5] w-full shrink-0 animate-pulse bg-gray-200" />
+        <div class="flex flex-1 flex-col p-6">
+          <div class="h-5 w-3/4 animate-pulse rounded bg-gray-200" />
+          <div class="mt-2 h-4 w-1/3 animate-pulse rounded bg-gray-100" />
+          <div class="mt-2 flex gap-2">
+            <span class="h-5 w-16 animate-pulse rounded-full bg-gray-100" />
+            <span class="h-4 w-20 animate-pulse rounded bg-gray-100" />
+          </div>
+          <div class="mt-4 h-10 w-full animate-pulse rounded-md bg-gray-200" />
+        </div>
+      </div>
     </div>
 
     <div
       v-else-if="error"
+      role="alert"
       class="rounded-lg border border-red-200 bg-red-50 py-12 text-center text-red-600"
     >
       {{ error }}
@@ -36,14 +58,15 @@
         <span class="h-14 w-10 rounded border border-gray-200 bg-gray-50" />
       </div>
       <h2 class="text-xl font-semibold text-gray-900">
-        Создать карусель
+        Пока нет каруселей
       </h2>
-      <p class="mt-1 max-w-sm text-sm text-gray-500">
-        Покажем новое видео с каждого аккаунта в течение 24 часов
+      <p class="mt-1 max-w-sm text-sm text-gray-700">
+        Создайте первую карусель
       </p>
       <NuxtLink
         to="/create"
-        class="mt-6 inline-flex justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
+        class="mt-6 inline-flex justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        aria-label="Создать первую карусель"
       >
         + Создать
       </NuxtLink>

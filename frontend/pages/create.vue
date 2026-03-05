@@ -3,8 +3,11 @@
     <div role="status" aria-live="polite" class="sr-only">
       Шаг {{ step + 1 }} из 3
     </div>
-    <nav aria-label="Хлебные крошки" class="mb-6 flex items-center gap-2 text-sm text-gray-600">
-      <NuxtLink to="/" class="transition-colors hover:text-primary">
+      <nav aria-label="Хлебные крошки" class="mb-6 flex items-center gap-2 text-sm text-gray-700">
+      <NuxtLink
+        to="/"
+        class="transition-colors hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+      >
         Карусели
       </NuxtLink>
       <span aria-hidden="true">/</span>
@@ -15,14 +18,14 @@
       <h1 class="mb-2 font-sans text-2xl font-bold text-gray-900">
         Выберите источник
       </h1>
-      <p class="mb-8 text-gray-600">
+      <p class="mb-8 text-gray-700">
         Откуда взять контент для карусели?
       </p>
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <button
           type="button"
           :aria-pressed="sourceType === 'text'"
-          class="flex flex-col rounded-xl border-2 border-gray-200 bg-white p-6 text-left shadow-sm transition-all hover:border-primary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          class="flex flex-col rounded-xl border-2 border-gray-200 bg-white p-6 text-left shadow-sm transition-all hover:border-primary hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           @click="chooseSource('text')"
         >
           <span class="mb-2 text-2xl" aria-hidden="true">📝</span>
@@ -32,7 +35,7 @@
         <button
           type="button"
           :aria-pressed="sourceType === 'video'"
-          class="flex flex-col rounded-xl border-2 border-gray-200 bg-white p-6 text-left shadow-sm transition-all hover:border-primary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          class="flex flex-col rounded-xl border-2 border-gray-200 bg-white p-6 text-left shadow-sm transition-all hover:border-primary hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           @click="chooseSource('video')"
         >
           <span class="mb-2 text-2xl" aria-hidden="true">🎬</span>
@@ -42,7 +45,7 @@
         <button
           type="button"
           :aria-pressed="sourceType === 'links'"
-          class="flex flex-col rounded-xl border-2 border-gray-200 bg-white p-6 text-left shadow-sm transition-all hover:border-primary hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
+          class="flex flex-col rounded-xl border-2 border-gray-200 bg-white p-6 text-left shadow-sm transition-all hover:border-primary hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           @click="chooseSource('links')"
         >
           <span class="mb-2 text-2xl" aria-hidden="true">🔗</span>
@@ -56,7 +59,7 @@
       <h1 ref="step1Heading" tabindex="-1" class="mb-2 font-sans text-2xl font-bold text-gray-900">
         Исходные данные
       </h1>
-      <p class="mb-6 text-gray-600">
+      <p class="mb-6 text-gray-700">
         {{ sourceType === 'text' ? 'Введите или вставьте текст' : sourceType === 'video' ? 'Укажите ссылку на видео (файл можно загрузить после создания)' : 'Введите ссылки (по одной на строку)' }}
       </p>
 
@@ -68,8 +71,10 @@
           rows="10"
           class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="Вставьте сюда текст для карусели…"
+          :aria-describedby="inputError ? 'source-text-error' : undefined"
+          :aria-invalid="inputError ? 'true' : undefined"
         />
-        <p v-if="inputError" class="text-sm text-red-600">
+        <p v-if="inputError" id="source-text-error" class="text-sm text-red-600">
           {{ inputError }}
         </p>
       </div>
@@ -96,8 +101,10 @@
           rows="8"
           class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="https://example.com/page1&#10;https://example.com/page2"
+          :aria-describedby="inputError ? 'source-links-error' : undefined"
+          :aria-invalid="inputError ? 'true' : undefined"
         />
-        <p v-if="inputError" class="text-sm text-red-600">
+        <p v-if="inputError" id="source-links-error" class="text-sm text-red-600">
           {{ inputError }}
         </p>
       </div>
@@ -105,14 +112,16 @@
       <div class="mt-8 flex flex-wrap gap-3">
         <button
           type="button"
-          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+          class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          aria-label="Вернуться к выбору источника"
           @click="step = 0"
         >
           Назад
         </button>
         <button
           type="button"
-          class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
+          class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          aria-label="Перейти к настройке формата"
           @click="goToFormat"
         >
           Далее
@@ -124,7 +133,7 @@
       <h1 class="mb-2 font-sans text-2xl font-bold text-gray-900">
         Настроить формат
       </h1>
-      <p class="mb-6 text-gray-600">
+      <p class="mb-6 text-gray-700">
         Количество слайдов, язык и стиль поста.
       </p>
 
@@ -142,8 +151,8 @@
           </select>
         </div>
 
-        <div>
-          <label class="block text-sm font-medium text-gray-700">Язык</label>
+        <fieldset>
+          <legend class="block text-sm font-medium text-gray-700">Язык</legend>
           <div class="mt-2 flex flex-wrap gap-4">
             <label class="inline-flex cursor-pointer items-center gap-2">
               <input
@@ -173,7 +182,7 @@
               <span>FR</span>
             </label>
           </div>
-        </div>
+        </fieldset>
 
         <div>
           <label for="style-hint" class="block text-sm font-medium text-gray-700">Пример поста</label>
@@ -193,15 +202,17 @@
         <div class="flex flex-wrap gap-3">
           <button
             type="button"
-            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50"
+            class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="Вернуться к исходным данным"
             @click="goBack"
           >
             Назад
           </button>
           <button
             type="submit"
-            class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+            class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
             :disabled="submitting"
+            :aria-label="submitting ? 'Создание карусели…' : 'Создать карусель'"
           >
             {{ submitting ? 'Создание…' : 'Создать' }}
           </button>
@@ -248,6 +259,7 @@ function chooseSource(type: SourceType) {
 function goBack() {
   step.value = 1;
   formatError.value = "";
+  nextTick(() => step1Heading.value?.focus());
 }
 
 function validateInput(): boolean {

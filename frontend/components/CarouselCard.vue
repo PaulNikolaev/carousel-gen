@@ -24,21 +24,22 @@
       <h2 :id="titleId" class="line-clamp-2 text-lg font-semibold text-gray-900">
         {{ carousel.title || 'Без названия' }}
       </h2>
-      <p class="mt-1 text-sm text-gray-500">
+      <p class="mt-1 text-sm text-gray-700">
         {{ formattedDate }}
       </p>
       <div class="mt-2 flex flex-wrap items-center gap-2">
         <span :class="statusBadgeClass">
           {{ statusLabel }}
         </span>
-        <span class="text-xs text-gray-500">
+        <span class="text-xs text-gray-700">
           {{ languageLabel }} · {{ slidesLabel }}
         </span>
       </div>
       <div class="mt-4 flex flex-1 items-end">
         <NuxtLink
           :to="editorPath"
-          class="inline-flex w-full justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
+          class="inline-flex w-full justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          :aria-label="`${cardButtonLabel}: ${carousel.title || 'Без названия'}`"
         >
           {{ cardButtonLabel }}
         </NuxtLink>

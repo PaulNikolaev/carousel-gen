@@ -4,7 +4,7 @@
       <nav aria-label="Основная навигация" class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2 px-4 py-3 sm:px-6">
         <NuxtLink
           to="/"
-          class="flex items-center gap-2 text-lg font-semibold text-accent transition-colors hover:text-accent/90"
+          class="flex items-center gap-2 text-lg font-semibold text-accent transition-colors hover:text-accent/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
         >
           <span
             class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border-2 border-accent text-accent"
@@ -17,14 +17,14 @@
         <div class="flex flex-wrap gap-4">
           <NuxtLink
             to="/"
-            class="text-gray-600 transition-colors hover:text-accent"
+            class="text-gray-700 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
             exact-active-class="text-accent font-medium"
           >
             Список каруселей
           </NuxtLink>
           <NuxtLink
             to="/create"
-            class="text-gray-600 transition-colors hover:text-accent"
+            class="text-gray-700 transition-colors hover:text-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
             active-class="text-accent font-medium"
           >
             Создать карусель

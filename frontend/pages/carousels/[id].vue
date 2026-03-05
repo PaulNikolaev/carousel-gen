@@ -1,7 +1,10 @@
 <template>
   <div class="font-sans tracking-[-0.025em]" style="font-size: 13.5px;">
-    <nav aria-label="Хлебные крошки" class="mb-4 flex items-center gap-2 text-gray-600">
-      <NuxtLink to="/" class="transition-colors hover:text-primary">
+    <nav aria-label="Хлебные крошки" class="mb-4 flex items-center gap-2 text-gray-700">
+      <NuxtLink
+        to="/"
+        class="transition-colors hover:text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+      >
         Карусели
       </NuxtLink>
       <span aria-hidden="true">/</span>
@@ -26,8 +29,9 @@
         </p>
         <button
           type="button"
-          class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+          class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           :disabled="starting"
+          aria-label="Запустить генерацию слайдов"
           @click="startGeneration"
         >
           {{ starting ? "Запуск…" : "Сгенерировать" }}
@@ -39,14 +43,12 @@
         <h1 class="mb-2 text-2xl font-bold text-gray-900">
           Генерация
         </h1>
-        <div class="flex items-center gap-3">
+        <div role="status" aria-live="polite" class="flex items-center gap-3">
           <span
             class="inline-block h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent"
             aria-hidden="true"
           />
-          <span class="text-gray-700">
-            {{ progressStatusText }}
-          </span>
+          <span class="text-gray-700">{{ progressStatusText }}</span>
         </div>
         <p v-if="tokensEstimate !== null" class="mt-2 text-gray-600">
           Спишется ориентировочно {{ tokensEstimate }} токенов.
@@ -63,7 +65,8 @@
         </p>
         <button
           type="button"
-          class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90"
+          class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          aria-label="Повторить генерацию"
           @click="startGeneration"
         >
           Повторить
@@ -79,18 +82,29 @@
           <div class="flex items-center gap-3">
             <button
               type="button"
-              class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+              class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               :disabled="!canExport"
+              aria-label="Экспорт карусели в ZIP"
               @click="startExport"
             >
               Экспорт
             </button>
             <NuxtLink
               to="/"
-              class="text-accent font-medium transition-colors hover:text-accent/90"
+              class="text-accent font-medium transition-colors hover:text-accent/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+              aria-label="Готово, вернуться к списку каруселей"
             >
               Готово
             </NuxtLink>
+            <button
+              ref="settingsButtonRef"
+              type="button"
+              class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 md:hidden"
+              aria-label="Открыть настройки дизайна"
+              @click="designSheetOpen = true"
+            >
+              Настройки
+            </button>
           </div>
         </div>
         <!-- Export progress -->
@@ -131,108 +145,230 @@
           <span>{{ exportError || "Экспорт не удался." }}</span>
           <button
             type="button"
-            class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-white transition-colors hover:bg-primary/90"
+            class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-white transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="Повторить экспорт"
             @click="startExport"
           >
             Повторить
           </button>
         </div>
-        <p v-if="editorSlidesLoading" class="text-gray-500">
+        <p v-if="editorSlidesLoading" role="status" class="text-gray-500">
           Загрузка слайдов…
         </p>
-        <div
-          v-else
-          class="grid gap-4"
-          style="grid-template-columns: minmax(0, 120px) minmax(0, 1fr) minmax(0, 280px);"
-        >
-          <!-- Left: thumbnails -->
-          <div class="flex flex-col gap-2 overflow-y-auto">
-            <button
-              v-for="(s, idx) in editorSlides"
-              :key="s.id"
-              type="button"
-              class="slide-thumb flex shrink-0 overflow-hidden rounded border-2 transition-colors"
-              :class="currentSlideIndex === idx ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'"
-              :aria-label="`Слайд ${s.order}`"
-              :aria-pressed="currentSlideIndex === idx"
-              style="aspect-ratio: 4/5; max-height: 120px;"
-              @click="currentSlideIndex = idx"
-            >
-              <SlidePreview
-                :slide="{ title: s.title, body: s.body, footer: s.footer }"
-                :design="editorDesignThumb"
-                :slide-index="s.order"
-                :total-slides="editorSlides.length"
-                class="!h-full !w-full !rounded-none !border-0"
-              />
-            </button>
-          </div>
-          <!-- Center: current slide preview (4:5) -->
-          <div class="flex min-h-0 items-start justify-center">
-            <div class="w-full max-w-md">
-              <template v-if="currentSlide">
+        <template v-else>
+          <!-- Desktop: grid thumbnails | preview | aside -->
+          <div
+            class="hidden gap-4 md:grid"
+            style="grid-template-columns: minmax(0, 120px) minmax(0, 1fr) minmax(0, 280px);"
+          >
+            <div class="flex flex-col gap-2 overflow-y-auto">
+              <button
+                v-for="(s, idx) in editorSlides"
+                :key="s.id"
+                type="button"
+                class="slide-thumb flex shrink-0 overflow-hidden rounded border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                :class="currentSlideIndex === idx ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'"
+                :aria-label="`Слайд ${s.order}`"
+                :aria-pressed="currentSlideIndex === idx"
+                style="aspect-ratio: 4/5; max-height: 120px;"
+                @click="currentSlideIndex = idx"
+              >
                 <SlidePreview
-                  :slide="{ title: currentSlide.title, body: currentSlide.body, footer: currentSlide.footer }"
-                  :design="editorDesign"
-                  :slide-index="currentSlide.order"
+                  :slide="{ title: s.title, body: s.body, footer: s.footer }"
+                  :design="editorDesignThumb"
+                  :slide-index="s.order"
                   :total-slides="editorSlides.length"
+                  class="!h-full !w-full !rounded-none !border-0"
                 />
-              </template>
+              </button>
+            </div>
+            <div class="flex min-h-0 items-start justify-center">
+              <div class="w-full max-w-md">
+                <template v-if="currentSlide">
+                  <SlidePreview
+                    :slide="{ title: currentSlide.title, body: currentSlide.body, footer: currentSlide.footer }"
+                    :design="editorDesign"
+                    :slide-index="currentSlide.order"
+                    :total-slides="editorSlides.length"
+                  />
+                </template>
+              </div>
+            </div>
+            <aside class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+              <h2 class="text-sm font-semibold text-gray-900">
+                Настройки
+              </h2>
+              <DesignPanel
+                :design="editorDesign"
+                @update="onDesignUpdate"
+                @apply-to-all="onDesignApplyToAll"
+              />
+              <div class="border-t border-gray-200 pt-3">
+                <h3 class="mb-2 text-xs font-semibold text-gray-700">
+                  Текст слайда
+                </h3>
+                <template v-if="currentSlide">
+                  <div class="flex flex-col gap-1">
+                    <label for="edit-title" class="text-xs font-medium text-gray-700">Заголовок</label>
+                    <textarea
+                      id="edit-title"
+                      :value="editTitle"
+                      rows="2"
+                      class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      @input="onEditTitle"
+                    />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label for="edit-body" class="text-xs font-medium text-gray-700">Текст</label>
+                    <textarea
+                      id="edit-body"
+                      :value="editBody"
+                      rows="4"
+                      class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      @input="onEditBody"
+                    />
+                  </div>
+                  <div class="flex flex-col gap-1">
+                    <label for="edit-footer" class="text-xs font-medium text-gray-700">Подвал</label>
+                    <input
+                      id="edit-footer"
+                      :value="editFooter"
+                      type="text"
+                      class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                      @input="onEditFooter"
+                    />
+                  </div>
+                </template>
+              </div>
+            </aside>
+          </div>
+
+          <!-- Mobile: preview + horizontal thumbnails strip -->
+          <div class="flex flex-col gap-4 md:hidden">
+            <div class="flex min-h-0 justify-center">
+              <div class="w-full max-w-md">
+                <template v-if="currentSlide">
+                  <SlidePreview
+                    :slide="{ title: currentSlide.title, body: currentSlide.body, footer: currentSlide.footer }"
+                    :design="editorDesign"
+                    :slide-index="currentSlide.order"
+                    :total-slides="editorSlides.length"
+                  />
+                </template>
+              </div>
+            </div>
+            <div
+              class="flex gap-2 overflow-x-auto pb-2"
+              style="min-height: 90px;"
+            >
+              <button
+                v-for="(s, idx) in editorSlides"
+                :key="s.id"
+                type="button"
+                class="slide-thumb-mobile flex h-[90px] shrink-0 overflow-hidden rounded border-2 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                :class="currentSlideIndex === idx ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'"
+                :aria-label="`Слайд ${s.order}`"
+                :aria-pressed="currentSlideIndex === idx"
+                style="aspect-ratio: 4/5;"
+                @click="currentSlideIndex = idx"
+              >
+                <SlidePreview
+                  :slide="{ title: s.title, body: s.body, footer: s.footer }"
+                  :design="editorDesignThumb"
+                  :slide-index="s.order"
+                  :total-slides="editorSlides.length"
+                  class="!h-full !w-full !rounded-none !border-0"
+                />
+              </button>
             </div>
           </div>
-          <!-- Right: design panel + slide edit fields -->
-          <aside class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-            <h2 class="text-sm font-semibold text-gray-900">
-              Настройки
-            </h2>
-            <DesignPanel
-              :design="editorDesign"
-              @update="onDesignUpdate"
-              @apply-to-all="onDesignApplyToAll"
-            />
-            <div class="border-t border-gray-200 pt-3">
-              <h3 class="mb-2 text-xs font-semibold text-gray-700">
-                Текст слайда
-              </h3>
-              <template v-if="currentSlide">
-                <div class="flex flex-col gap-1">
-                  <label for="edit-title" class="text-xs font-medium text-gray-600">Заголовок</label>
-                  <textarea
-                    id="edit-title"
-                    :value="editTitle"
-                    rows="2"
-                    class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    @input="onEditTitle"
-                  />
+
+          <!-- Bottom-sheet: design panel + slide fields (mobile) -->
+          <Teleport to="body">
+            <Transition name="sheet-backdrop">
+              <div
+                v-show="designSheetOpen"
+                class="fixed inset-0 z-40 bg-black/40 md:hidden"
+                aria-hidden="true"
+                @click="designSheetOpen = false"
+              />
+            </Transition>
+            <Transition name="sheet-slide">
+              <div
+                ref="sheetDialogRef"
+                v-show="designSheetOpen"
+                class="fixed bottom-0 left-0 right-0 z-50 max-h-[80vh] overflow-y-auto rounded-t-xl border border-gray-200 border-b-0 bg-white shadow-xl md:hidden"
+                role="dialog"
+                aria-modal="true"
+                aria-label="Настройки дизайна и текст слайда"
+                @keydown.esc="designSheetOpen = false"
+              >
+                <div class="sticky top-0 flex justify-end border-b border-gray-200 bg-white p-2">
+                  <button
+                    ref="sheetCloseButtonRef"
+                    type="button"
+                    class="rounded-md p-2 text-gray-600 transition-colors hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    aria-label="Закрыть настройки"
+                    @click="designSheetOpen = false"
+                  >
+                    <span aria-hidden="true">✕</span>
+                  </button>
                 </div>
-                <div class="flex flex-col gap-1">
-                  <label for="edit-body" class="text-xs font-medium text-gray-600">Текст</label>
-                  <textarea
-                    id="edit-body"
-                    :value="editBody"
-                    rows="4"
-                    class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    @input="onEditBody"
+                <div class="flex flex-col gap-4 p-4">
+                  <h2 class="text-sm font-semibold text-gray-900">
+                    Настройки
+                  </h2>
+                  <DesignPanel
+                    :design="editorDesign"
+                    @update="onDesignUpdate"
+                    @apply-to-all="onDesignApplyToAll"
                   />
+                  <div class="border-t border-gray-200 pt-3">
+                    <h3 class="mb-2 text-xs font-semibold text-gray-700">
+                      Текст слайда
+                    </h3>
+                    <template v-if="currentSlide">
+                      <div class="flex flex-col gap-1">
+                        <label for="edit-title-mobile" class="text-xs font-medium text-gray-700">Заголовок</label>
+                        <textarea
+                          id="edit-title-mobile"
+                          :value="editTitle"
+                          rows="2"
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          @input="onEditTitle"
+                        />
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <label for="edit-body-mobile" class="text-xs font-medium text-gray-700">Текст</label>
+                        <textarea
+                          id="edit-body-mobile"
+                          :value="editBody"
+                          rows="4"
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          @input="onEditBody"
+                        />
+                      </div>
+                      <div class="flex flex-col gap-1">
+                        <label for="edit-footer-mobile" class="text-xs font-medium text-gray-700">Подвал</label>
+                        <input
+                          id="edit-footer-mobile"
+                          :value="editFooter"
+                          type="text"
+                          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                          @input="onEditFooter"
+                        />
+                      </div>
+                    </template>
+                  </div>
                 </div>
-                <div class="flex flex-col gap-1">
-                  <label for="edit-footer" class="text-xs font-medium text-gray-600">Подвал</label>
-                  <input
-                    id="edit-footer"
-                    :value="editFooter"
-                    type="text"
-                    class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                    @input="onEditFooter"
-                  />
-                </div>
-              </template>
-            </div>
-          </aside>
-        </div>
+              </div>
+            </Transition>
+          </Teleport>
+        </template>
       </template>
     </template>
 
-    <div v-else class="text-gray-500">
+    <div v-else role="status" class="text-gray-500">
       Загрузка…
     </div>
   </div>
@@ -289,6 +425,48 @@ const exportId = ref<string | null>(null);
 const exportStatus = ref<ExportResponse["status"] | null>(null);
 const exportDownloadUrl = ref<string | null>(null);
 const exportError = ref<string | null>(null);
+
+const designSheetOpen = ref(false);
+const settingsButtonRef = ref<HTMLButtonElement | null>(null);
+const sheetCloseButtonRef = ref<HTMLButtonElement | null>(null);
+const sheetDialogRef = ref<HTMLElement | null>(null);
+
+function handleSheetKeydown(e: KeyboardEvent) {
+  if (!sheetDialogRef.value) return;
+  const focusable = Array.from(
+    sheetDialogRef.value.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((el) => !el.hasAttribute('disabled'));
+  if (!focusable.length) return;
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  if (e.key === 'Tab') {
+    if (e.shiftKey) {
+      if (document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      }
+    } else {
+      if (document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    }
+  }
+}
+
+watch(designSheetOpen, (open) => {
+  if (open) {
+    nextTick(() => {
+      sheetCloseButtonRef.value?.focus();
+      sheetDialogRef.value?.addEventListener('keydown', handleSheetKeydown);
+    });
+  } else {
+    sheetDialogRef.value?.removeEventListener('keydown', handleSheetKeydown);
+    nextTick(() => settingsButtonRef.value?.focus());
+  }
+});
 
 const canExport = computed(() => {
   if (carousel.value?.status !== "ready") return false;
@@ -696,6 +874,7 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  sheetDialogRef.value?.removeEventListener('keydown', handleSheetKeydown);
   stopPolling();
   stopCarouselPolling();
   clearExportState();
@@ -703,3 +882,22 @@ onUnmounted(() => {
   if (designDebounceTimer) clearTimeout(designDebounceTimer);
 });
 </script>
+
+<style scoped>
+.sheet-backdrop-enter-active,
+.sheet-backdrop-leave-active {
+  transition: opacity 0.2s ease;
+}
+.sheet-backdrop-enter-from,
+.sheet-backdrop-leave-to {
+  opacity: 0;
+}
+.sheet-slide-enter-active,
+.sheet-slide-leave-active {
+  transition: transform 0.25s ease;
+}
+.sheet-slide-enter-from,
+.sheet-slide-leave-to {
+  transform: translateY(100%);
+}
+</style>
