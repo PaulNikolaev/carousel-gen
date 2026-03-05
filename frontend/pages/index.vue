@@ -1,12 +1,12 @@
 <template>
   <div>
     <div class="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-      <h1 class="text-3xl font-bold text-gray-900">
+      <h1 class="font-sans text-3xl font-bold text-gray-900">
         Мои карусели
       </h1>
       <NuxtLink
         to="/create"
-        class="inline-flex justify-center rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-gray-800"
+        class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
       >
         Создать карусель
       </NuxtLink>
@@ -25,9 +25,28 @@
 
     <div
       v-else-if="!items.length"
-      class="rounded-lg border border-gray-200 bg-white py-12 text-center text-gray-500"
+      class="flex flex-col items-center justify-center rounded-lg border border-gray-200 bg-white py-12 text-center"
     >
-      Каруселей пока нет. Создайте первую.
+      <div
+        class="mb-4 flex gap-1 text-gray-300"
+        aria-hidden="true"
+      >
+        <span class="h-14 w-10 rounded border border-gray-200 bg-gray-50" />
+        <span class="h-16 w-11 rounded border border-gray-200 bg-gray-100" />
+        <span class="h-14 w-10 rounded border border-gray-200 bg-gray-50" />
+      </div>
+      <h2 class="text-xl font-semibold text-gray-900">
+        Создать карусель
+      </h2>
+      <p class="mt-1 max-w-sm text-sm text-gray-500">
+        Покажем новое видео с каждого аккаунта в течение 24 часов
+      </p>
+      <NuxtLink
+        to="/create"
+        class="mt-6 inline-flex justify-center rounded-md bg-primary px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
+      >
+        + Создать
+      </NuxtLink>
     </div>
 
     <div
@@ -46,10 +65,6 @@
 <script setup lang="ts">
 import type { CarouselListResponse } from "~/types/carousel";
 
-definePageMeta({
-  layout: "default",
-});
-
 const { request } = useApi();
 
 const items = ref<CarouselListResponse["items"]>([]);
@@ -57,19 +72,28 @@ const pending = ref(true);
 const error = ref<string | null>(null);
 const fetching = ref(false);
 
+let abortController: AbortController | null = null;
+
 async function fetchList() {
   if (fetching.value) return;
   fetching.value = true;
   error.value = null;
   pending.value = true;
+
+  abortController = new AbortController();
+
   try {
-    const data = await request<CarouselListResponse>("/api/v1/carousels");
+    const data = await request<CarouselListResponse>("/api/v1/carousels", {
+      signal: abortController.signal,
+    });
     items.value = data.items;
   } catch (e) {
-    error.value = e instanceof Error ? e.message : "Ошибка загрузки";
+    if (e instanceof DOMException && e.name === "AbortError") return;
+    error.value = "Не удалось загрузить список каруселей";
   } finally {
     pending.value = false;
     fetching.value = false;
+    abortController = null;
   }
 }
 
@@ -111,5 +135,6 @@ watch(hasGenerating, (val) => {
 
 onUnmounted(() => {
   stopPolling();
+  abortController?.abort();
 });
 </script>

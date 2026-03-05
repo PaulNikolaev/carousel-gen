@@ -20,7 +20,7 @@
         <span class="text-4xl">📷</span>
       </div>
     </div>
-    <div class="flex flex-1 flex-col p-4">
+    <div class="flex flex-1 flex-col p-6">
       <h2 :id="titleId" class="line-clamp-2 text-lg font-semibold text-gray-900">
         {{ carousel.title || 'Без названия' }}
       </h2>
@@ -38,7 +38,7 @@
       <div class="mt-4 flex flex-1 items-end">
         <NuxtLink
           :to="editorPath"
-          class="inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+          class="inline-flex w-full justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90"
         >
           {{ cardButtonLabel }}
         </NuxtLink>
@@ -56,6 +56,10 @@ const props = defineProps<{
 
 const titleId = computed(() => `carousel-title-${props.carousel.id}`);
 const previewError = ref(false);
+
+watch(() => props.carousel.preview_url, () => {
+  previewError.value = false;
+});
 
 const formattedDate = computed(() => {
   const raw = props.carousel.created_at;
@@ -107,7 +111,7 @@ const languageLabels: Record<string, string> = {
 };
 
 const languageLabel = computed(
-  () => languageLabels[props.carousel.language] ?? props.carousel.language?.toUpperCase() ?? "—"
+  () => languageLabels[props.carousel.language] ?? props.carousel.language.toUpperCase()
 );
 
 const slidesLabel = computed(() => {
