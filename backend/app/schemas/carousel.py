@@ -1,9 +1,10 @@
 """Pydantic schemas for Carousel API."""
 
 from datetime import datetime
+from urllib.parse import urlparse
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.enums import CarouselStatusEnum, SourceTypeEnum
 
@@ -28,10 +29,21 @@ class CarouselCreate(BaseModel):
 
 
 class CarouselUpdate(BaseModel):
-    """Payload for PATCH: update title and/or format."""
+    """Payload for PATCH: update title, format and/or video_url."""
 
     title: str | None = None
     format: FormatSchema | None = None
+    video_url: str | None = None
+
+    @field_validator("video_url")
+    @classmethod
+    def validate_video_url(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        parsed = urlparse(v)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError("video_url must be a valid http/https URL")
+        return v
 
 
 class CarouselResponse(BaseModel):

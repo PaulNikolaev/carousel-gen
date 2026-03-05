@@ -26,10 +26,29 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
     raise exc
 
 
+def _sanitize_validation_errors(errors: list) -> list:
+    """Make validation error dicts JSON-serializable (e.g. ctx may contain Exception)."""
+    out = []
+    for e in errors:
+        if not isinstance(e, dict):
+            out.append({"msg": str(e)})
+            continue
+        cleaned = {}
+        for k, v in e.items():
+            if k == "ctx" and isinstance(v, dict):
+                cleaned[k] = {k2: str(v2) if not isinstance(v2, (str, int, float, bool, type(None))) else v2 for k2, v2 in v.items()}
+            elif isinstance(v, Exception):
+                cleaned[k] = str(v)
+            else:
+                cleaned[k] = v
+        out.append(cleaned)
+    return out
+
+
 async def validation_exception_handler(
     request: Request, exc: RequestValidationError
 ) -> JSONResponse:
-    return _error_response(detail=exc.errors(), code=422)
+    return _error_response(detail=_sanitize_validation_errors(exc.errors()), code=422)
 
 
 @asynccontextmanager

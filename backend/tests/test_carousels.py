@@ -1,7 +1,29 @@
-"""Pytest + httpx tests for /api/v1/carousels: POST, GET list, GET by id, PATCH."""
+"""Pytest + httpx tests for /api/v1/carousels: POST, GET list, GET by id, PATCH, video upload, video_url."""
 
+import io
 import pytest
 from httpx import AsyncClient
+
+from app.api.carousels import _get_storage
+from app.main import app
+
+
+class MockStorageService:
+    """Mock StorageService for tests; upload_file returns a fixed key without S3."""
+
+    async def upload_file(self, file_obj, filename, bucket=None, prefix="uploads"):
+        return "http://mock/url", f"{prefix}/mock-{filename}"
+
+
+@pytest.fixture
+async def client_with_mock_storage(client: AsyncClient):
+    """Client with StorageService overridden so uploads don't hit S3."""
+    mock_storage = MockStorageService()
+    app.dependency_overrides[_get_storage] = lambda: mock_storage
+    try:
+        yield client
+    finally:
+        app.dependency_overrides.pop(_get_storage, None)
 
 
 @pytest.mark.asyncio
@@ -142,6 +164,171 @@ async def test_patch_carousel_not_found_404(client: AsyncClient) -> None:
     response = await client.patch(
         "/api/v1/carousels/00000000-0000-0000-0000-000000000001",
         json={"title": "No"},
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
+# --- POST /carousels/{id}/video (step 4.2) ---
+
+
+@pytest.mark.asyncio
+async def test_upload_carousel_video_200(client_with_mock_storage: AsyncClient) -> None:
+    """POST /carousels/{id}/video with valid mp4 returns 200 and source_payload.video_key."""
+    create_resp = await client_with_mock_storage.post(
+        "/api/v1/carousels",
+        json={"title": "Video Carousel", "source_type": "video"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    response = await client_with_mock_storage.post(
+        f"/api/v1/carousels/{carousel_id}/video",
+        files={"file": ("test.mp4", io.BytesIO(b"fake mp4 content"), "video/mp4")},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source_type"] == "video"
+    assert "source_payload" in data
+    assert data["source_payload"].get("video_key") is not None
+    assert "carousels/video" in data["source_payload"]["video_key"] or "mock" in data["source_payload"]["video_key"]
+
+
+@pytest.mark.asyncio
+async def test_upload_carousel_video_wrong_source_type_400(
+    client_with_mock_storage: AsyncClient,
+) -> None:
+    """POST /carousels/{id}/video for carousel with source_type != video returns 400."""
+    create_resp = await client_with_mock_storage.post(
+        "/api/v1/carousels",
+        json={"title": "Text Carousel", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    response = await client_with_mock_storage.post(
+        f"/api/v1/carousels/{carousel_id}/video",
+        files={"file": ("test.mp4", io.BytesIO(b"x"), "video/mp4")},
+    )
+    assert response.status_code == 400
+    assert "detail" in response.json()
+    assert "video" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_upload_carousel_video_not_found_404(
+    client_with_mock_storage: AsyncClient,
+) -> None:
+    """POST /carousels/{id}/video for non-existent carousel returns 404."""
+    response = await client_with_mock_storage.post(
+        "/api/v1/carousels/00000000-0000-0000-0000-000000000001/video",
+        files={"file": ("test.mp4", io.BytesIO(b"x"), "video/mp4")},
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_upload_carousel_video_invalid_file_type_400(
+    client_with_mock_storage: AsyncClient,
+) -> None:
+    """POST /carousels/{id}/video with wrong extension/content-type returns 400."""
+    create_resp = await client_with_mock_storage.post(
+        "/api/v1/carousels",
+        json={"title": "Video Carousel", "source_type": "video"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    response = await client_with_mock_storage.post(
+        f"/api/v1/carousels/{carousel_id}/video",
+        files={"file": ("document.pdf", io.BytesIO(b"pdf"), "application/pdf")},
+    )
+    assert response.status_code == 400
+    assert "detail" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_upload_carousel_video_file_too_large_400(
+    client_with_mock_storage: AsyncClient,
+) -> None:
+    """POST /carousels/{id}/video with file > 50 MB returns 400."""
+    create_resp = await client_with_mock_storage.post(
+        "/api/v1/carousels",
+        json={"title": "Video Carousel", "source_type": "video"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    # 50 * 1024 * 1024 + 1 byte
+    big = io.BytesIO(b"x" * (50 * 1024 * 1024 + 1))
+    response = await client_with_mock_storage.post(
+        f"/api/v1/carousels/{carousel_id}/video",
+        files={"file": ("large.mp4", big, "video/mp4")},
+    )
+    assert response.status_code == 400
+    assert "detail" in response.json()
+    assert "50" in response.json()["detail"] or "large" in response.json()["detail"].lower()
+
+
+# --- PATCH /carousels/{id} with video_url (step 4.2) ---
+
+
+@pytest.mark.asyncio
+async def test_patch_carousel_video_url_200(client: AsyncClient) -> None:
+    """PATCH /carousels/{id} with video_url for video carousel returns 200 and source_payload.video_url."""
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Video Carousel", "source_type": "video"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    response = await client.patch(
+        f"/api/v1/carousels/{carousel_id}",
+        json={"video_url": "https://example.com/v.mp4"},
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["source_type"] == "video"
+    assert data["source_payload"].get("video_url") == "https://example.com/v.mp4"
+
+
+@pytest.mark.asyncio
+async def test_patch_carousel_video_url_invalid_url_422(client: AsyncClient) -> None:
+    """PATCH /carousels/{id} with invalid video_url (non http/https) returns 422."""
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Video Carousel", "source_type": "video"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    response = await client.patch(
+        f"/api/v1/carousels/{carousel_id}",
+        json={"video_url": "ftp://example.com/v.mp4"},
+    )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_patch_carousel_video_url_non_video_400(client: AsyncClient) -> None:
+    """PATCH /carousels/{id} with video_url for non-video carousel returns 400."""
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Text Carousel", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    response = await client.patch(
+        f"/api/v1/carousels/{carousel_id}",
+        json={"video_url": "https://example.com/v.mp4"},
+    )
+    assert response.status_code == 400
+    assert "detail" in response.json()
+    assert "video" in response.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_patch_carousel_video_url_not_found_404(client: AsyncClient) -> None:
+    """PATCH /carousels/{id} with video_url for non-existent carousel returns 404."""
+    response = await client.patch(
+        "/api/v1/carousels/00000000-0000-0000-0000-000000000001",
+        json={"video_url": "https://example.com/v.mp4"},
     )
     assert response.status_code == 404
     assert "detail" in response.json()

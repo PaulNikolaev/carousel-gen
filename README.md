@@ -33,34 +33,47 @@
 
 ## Тестирование
 
-Тесты используют БД `carousel_test` и `docker-compose.test.yml`. Сервис `migrate` применяет миграции (`alembic upgrade head`) при старте.
+Тесты используют БД `carousel_test` и `docker-compose.test.yml`. Порядок запуска: **postgres** → **migrate** (миграции) → **backend** (pytest). Переменные окружения берутся из `backend/.env.test` (значения из compose переопределяют при необходимости).
 
-1. Скопируйте шаблон тестового окружения:
+Перед первым запуском создайте тестовый конфиг:
 
-   ```bash
-   cp backend/.env.test.example backend/.env.test
-   ```
+```bash
+cp backend/.env.test.example backend/.env.test
+```
 
-   PowerShell:
+PowerShell:
 
-   ```powershell
-   Copy-Item backend\.env.test.example backend\.env.test
-   ```
+```powershell
+Copy-Item backend\.env.test.example backend\.env.test
+```
 
-2. Поднимите стек и запустите тесты:
+В `.env.test` уже указан `DATABASE_URL` для Docker (`postgres:5432`); для локального pytest без compose см. раздел «Локальный запуск pytest».
 
-   ```bash
-   docker compose -f docker-compose.test.yml up -d
-   docker compose -f docker-compose.test.yml run --rm backend
-   ```
+### Одна команда (в фоне)
 
-   При `up -d` поднимается postgres, сервис `migrate` выполняет `alembic upgrade head` и завершается; при необходимости тесты запускают отдельно через `run --rm backend`.
+```bash
+docker compose -f docker-compose.test.yml up -d
+```
 
-3. Остановка:
+Поднимаются postgres, migrate и backend; backend один раз запускает pytest и завершается. Результаты тестов смотрите в логах:
 
-   ```bash
-   docker compose -f docker-compose.test.yml down
-   ```
+```bash
+docker compose -f docker-compose.test.yml logs backend
+```
+
+### Одна команда (вывод в консоль, код выхода = код pytest)
+
+```bash
+docker compose -f docker-compose.test.yml up --abort-on-container-exit
+```
+
+Вывод тестов идёт в консоль; после завершения pytest compose останавливается с тем же кодом выхода (0 = успех).
+
+### Остановка
+
+```bash
+docker compose -f docker-compose.test.yml down
+```
 
 ## Локальный запуск pytest
 

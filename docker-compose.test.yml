@@ -1,3 +1,14 @@
+# Запуск тестов одной командой:
+#
+#   docker compose -f docker-compose.test.yml up --abort-on-container-exit
+#
+# Поднимаются postgres → migrate → backend (pytest). Вывод тестов в консоль;
+# после завершения pytest compose останавливается, код выхода = код pytest (0 = успех).
+#
+# С флагом -d (в фоне):
+#   docker compose -f docker-compose.test.yml up -d
+# Результаты:  docker compose -f docker-compose.test.yml logs backend
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -21,6 +32,8 @@ services:
       dockerfile: Dockerfile
     env_file:
       - backend/.env.test
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/${POSTGRES_DB:-carousel_test}
     depends_on:
       postgres:
         condition: service_healthy
@@ -32,11 +45,22 @@ services:
       dockerfile: Dockerfile
     env_file:
       - backend/.env.test
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/${POSTGRES_DB:-carousel_test}
+      PYTEST_CACHE_DIR: /tmp/.pytest_cache
     depends_on:
       migrate:
         condition: service_completed_successfully
-    entrypoint: ["sh", "-c", "alembic upgrade head && exec \"$0\" \"$@\""]
-    command: ["python", "-m", "pytest", "tests", "-v"]
+    entrypoint:
+      - python
+      - -m
+      - pytest
+      - tests
+      - -v
+      - -o
+      - cache_dir=/tmp/.pytest_cache
+      - -o
+      - asyncio_default_fixture_loop_scope=function
 
 volumes:
   postgres_test_data:

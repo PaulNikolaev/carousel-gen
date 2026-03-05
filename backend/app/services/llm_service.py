@@ -26,6 +26,8 @@ def _source_content_from_payload(source_payload: dict[str, Any]) -> str:
         parts.append(f"Links: {joined}")
     if source_payload.get("notes"):
         parts.append("Notes: " + str(source_payload["notes"]).strip())
+    if source_payload.get("video_key") or source_payload.get("video_url"):
+        raise NotImplementedError("Video transcription is not yet implemented")
     return "\n\n".join(parts) if parts else "No content provided."
 
 
