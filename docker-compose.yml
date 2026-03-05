@@ -1,3 +1,7 @@
+# Основной стек приложения. Запуск: docker compose up -d
+# Остановка: docker compose down / down -v
+name: carousel-gen
+
 services:
   backend:
     build:

@@ -1,13 +1,8 @@
-# Запуск тестов одной командой:
-#
-#   docker compose -f docker-compose.test.yml up --abort-on-container-exit
-#
-# Поднимаются postgres → migrate → backend (pytest). Вывод тестов в консоль;
-# после завершения pytest compose останавливается, код выхода = код pytest (0 = успех).
-#
-# С флагом -d (в фоне):
-#   docker compose -f docker-compose.test.yml up -d
-# Результаты:  docker compose -f docker-compose.test.yml logs backend
+# Стек для тестов. Работает параллельно с основным (другой project name, сеть, тома).
+# Запуск: docker compose -f docker-compose.test.yml up -d
+# Логи:   docker compose -f docker-compose.test.yml logs backend
+# Остановка: docker compose -f docker-compose.test.yml down / down -v
+name: carousel-gen-test
 
 services:
   postgres:

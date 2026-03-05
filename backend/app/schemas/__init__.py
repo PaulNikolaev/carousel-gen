@@ -8,6 +8,11 @@ from app.schemas.carousel import (
     FormatSchema,
 )
 from app.schemas.llm import SlideGenerationItem, SlideGenerationResult
+from app.schemas.export import (
+    ExportResponse,
+    StartExportRequest,
+    StartExportResponse,
+)
 from app.schemas.generation import (
     GenerationResponse,
     GenerationSlideItem,
@@ -21,9 +26,12 @@ __all__ = [
     "CarouselListResponse",
     "CarouselResponse",
     "CarouselUpdate",
+    "ExportResponse",
     "FormatSchema",
     "GenerationResponse",
     "GenerationSlideItem",
+    "StartExportRequest",
+    "StartExportResponse",
     "StartGenerationRequest",
     "StartGenerationResponse",
     "SlideGenerationItem",

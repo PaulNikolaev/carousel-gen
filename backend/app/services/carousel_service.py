@@ -85,7 +85,7 @@ class CarouselService:
             format=format_dict,
             source_payload=source_payload,
         )
-        return _carousel_to_response(updated, self._preview_base_url)
+        return carousel_to_response(updated, self._preview_base_url)
 
     async def set_video_key(self, carousel_id: UUID, video_key: str) -> CarouselResponse | None:
         """Set source_payload.video_key for video source and clear video_url."""
@@ -98,4 +98,4 @@ class CarouselService:
         merged["video_key"] = video_key
         merged.pop("video_url", None)
         updated = await self._repo.update(carousel, source_payload=merged)
-        return _carousel_to_response(updated, self._preview_base_url)
+        return carousel_to_response(updated, self._preview_base_url)

@@ -173,8 +173,6 @@ async def render_carousel_to_zip(
             footer_enabled=True,
             footer_text="",
         )
-        session.add(design)
-        await session.flush()
 
     slides = sorted(carousel.slides, key=lambda s: s.order)
     if not slides:
