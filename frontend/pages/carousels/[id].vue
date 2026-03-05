@@ -76,12 +76,66 @@
           <h1 class="text-2xl font-bold text-gray-900">
             Редактор
           </h1>
-          <NuxtLink
-            to="/"
-            class="text-accent font-medium transition-colors hover:text-accent/90"
+          <div class="flex items-center gap-3">
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50"
+              :disabled="!canExport"
+              @click="startExport"
+            >
+              Экспорт
+            </button>
+            <NuxtLink
+              to="/"
+              class="text-accent font-medium transition-colors hover:text-accent/90"
+            >
+              Готово
+            </NuxtLink>
+          </div>
+        </div>
+        <!-- Export progress -->
+        <div
+          v-if="exportStatus === 'pending' || exportStatus === 'running'"
+          class="mb-4 flex items-center gap-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3"
+        >
+          <span
+            class="inline-block h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-primary border-t-transparent"
+            aria-hidden="true"
+          />
+          <span class="text-gray-700">Экспорт…</span>
+        </div>
+        <div
+          v-else-if="exportStatus === 'done' && exportDownloadUrl"
+          class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3"
+        >
+          <a
+            :href="exportDownloadUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Скачать ZIP (откроется в новой вкладке)"
+            class="text-primary font-medium underline transition-colors hover:text-primary/90"
           >
-            Готово
-          </NuxtLink>
+            Скачать ZIP
+          </a>
+        </div>
+        <div
+          v-else-if="exportStatus === 'done' && !exportDownloadUrl"
+          class="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700"
+        >
+          Экспорт завершён, но ссылка для скачивания недоступна.
+        </div>
+        <div
+          v-else-if="exportStatus === 'failed'"
+          class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-red-700"
+        >
+          <span>{{ exportError || "Экспорт не удался." }}</span>
+          <button
+            type="button"
+            class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-white transition-colors hover:bg-primary/90"
+            @click="startExport"
+          >
+            Повторить
+          </button>
         </div>
         <p v-if="editorSlidesLoading" class="text-gray-500">
           Загрузка слайдов…
@@ -198,6 +252,7 @@ import type {
   GenerationResponse,
   StartGenerationResponse,
 } from "~/types/generation";
+import type { ExportResponse, StartExportResponse } from "~/types/export";
 
 definePageMeta({ layout: "default" });
 
@@ -226,6 +281,21 @@ const pendingDesignPatch = ref<DesignUpdate>({});
 
 const POLL_INTERVAL_MS = 3000;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
+
+const EXPORT_POLL_INTERVAL_MS = 5000;
+let exportPollTimer: ReturnType<typeof setInterval> | null = null;
+
+const exportId = ref<string | null>(null);
+const exportStatus = ref<ExportResponse["status"] | null>(null);
+const exportDownloadUrl = ref<string | null>(null);
+const exportError = ref<string | null>(null);
+
+const canExport = computed(() => {
+  if (carousel.value?.status !== "ready") return false;
+  if (exportStatus.value === "pending" || exportStatus.value === "running")
+    return false;
+  return true;
+});
 
 type ViewMode = "draft" | "progress" | "failed" | "editor";
 
@@ -504,6 +574,63 @@ function stopPolling() {
   }
 }
 
+function clearExportState() {
+  exportId.value = null;
+  exportStatus.value = null;
+  exportDownloadUrl.value = null;
+  exportError.value = null;
+  stopExportPolling();
+}
+
+function stopExportPolling() {
+  if (exportPollTimer) {
+    clearInterval(exportPollTimer);
+    exportPollTimer = null;
+  }
+}
+
+async function pollExport() {
+  if (!exportId.value) return;
+  try {
+    const data = await request<ExportResponse>(
+      `/api/v1/exports/${exportId.value}`
+    );
+    exportStatus.value = data.status;
+    if (data.status === "done") {
+      exportDownloadUrl.value = data.download_url ?? null;
+      stopExportPolling();
+    } else if (data.status === "failed") {
+      exportError.value = data.error_message ?? null;
+      stopExportPolling();
+    }
+  } catch {
+    // keep polling on transient errors
+  }
+}
+
+function startExportPolling() {
+  stopExportPolling();
+  exportPollTimer = setInterval(pollExport, EXPORT_POLL_INTERVAL_MS);
+  pollExport();
+}
+
+async function startExport() {
+  if (!canExport.value) return;
+  clearExportState();
+  exportStatus.value = "pending";
+  try {
+    const data = await request<StartExportResponse>("/api/v1/exports", {
+      method: "POST",
+      body: { carousel_id: id.value },
+    });
+    exportId.value = data.export_id;
+    startExportPolling();
+  } catch {
+    exportStatus.value = null;
+    // useApi shows toast
+  }
+}
+
 async function ensureEditorSlides() {
   editorSlidesLoading.value = true;
   try {
@@ -571,6 +698,7 @@ onMounted(() => {
 onUnmounted(() => {
   stopPolling();
   stopCarouselPolling();
+  clearExportState();
   Object.values(debounceTimers).forEach(clearTimeout);
   if (designDebounceTimer) clearTimeout(designDebounceTimer);
 });
