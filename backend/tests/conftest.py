@@ -12,10 +12,12 @@ from app.main import app
 
 
 def _test_database_url() -> str:
-    return os.environ.get(
-        "TEST_DATABASE_URL",
-        os.environ.get("DATABASE_URL", "postgresql+asyncpg://postgres:postgres@localhost:5432/carousel"),
-    )
+    url = os.environ.get("TEST_DATABASE_URL")
+    if not url or not url.strip():
+        raise RuntimeError(
+            "TEST_DATABASE_URL must be set for tests (do not use DATABASE_URL/production)"
+        )
+    return url.strip()
 
 
 @pytest.fixture(scope="function")

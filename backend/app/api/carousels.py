@@ -3,6 +3,7 @@
 import io
 from uuid import UUID
 
+import filetype
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -46,7 +47,11 @@ def _get_storage() -> StorageService:
     return StorageService()
 
 
-def _validate_video_file(filename: str, content_type: str | None) -> None:
+def _validate_video_file(
+    filename: str,
+    content_type: str | None,
+    content: bytes | None = None,
+) -> None:
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext not in VIDEO_EXTENSIONS:
         raise HTTPException(
@@ -55,6 +60,16 @@ def _validate_video_file(filename: str, content_type: str | None) -> None:
         )
     if content_type not in VIDEO_MIME_TYPES:
         raise HTTPException(status_code=400, detail="Video content type not allowed")
+    if content:
+        kind = filetype.guess(content)
+        if kind is not None:
+            magic_ext = "." + kind.extension.lower()
+            magic_mime = kind.mime or ""
+            if magic_ext not in VIDEO_EXTENSIONS or magic_mime not in VIDEO_MIME_TYPES:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Only mp4, mov, avi video formats are allowed",
+                )
 
 
 @router.post("", response_model=CarouselResponse, status_code=201)
@@ -142,9 +157,9 @@ async def upload_carousel_video(
     if not file.filename or not file.filename.strip():
         raise HTTPException(status_code=400, detail="Missing filename")
     filename = file.filename.strip()
-    _validate_video_file(filename, file.content_type)
 
     content = await file.read(VIDEO_MAX_SIZE + 1)
+    _validate_video_file(filename, file.content_type, content)
     if len(content) > VIDEO_MAX_SIZE:
         raise HTTPException(
             status_code=400,

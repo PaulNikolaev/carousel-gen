@@ -1,5 +1,6 @@
 """Render carousel slides to PNG via Playwright and pack into ZIP for S3."""
 
+import asyncio
 import html
 import io
 import re
@@ -14,9 +15,13 @@ from sqlalchemy.orm import selectinload
 from app.core.config import get_settings
 from app.models.carousel import Carousel
 from app.models.carousel_design import CarouselDesign
-from app.models.enums import BackgroundTypeEnum
+from app.models.enums import BackgroundTypeEnum, TemplateEnum
 from app.models.slide import Slide
 from app.services.storage_service import StorageService
+
+_browser_lock = asyncio.Lock()
+_playwright_cm = None
+_shared_browser = None
 
 SLIDE_WIDTH = 1080
 SLIDE_HEIGHT = 1350
@@ -25,6 +30,12 @@ _CSS_COLOR_RE = re.compile(
     r"^(#[0-9a-fA-F]{3,8}|rgba?\(\d+,\s*\d+,\s*\d+(?:,\s*[\d.]+)?\)|[a-zA-Z]{2,32})$"
 )
 _SAFE_URL_RE = re.compile(r"^https?://")
+_BLOCKED_URL_PATTERNS = (
+    r"^https?://(127\.|10\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|localhost|\[::1\])",
+    r"^https?://\[?::1\]?",
+    r"^https?://0\.0\.0\.0",
+)
+_BLOCKED_URL_RE = re.compile("|".join(f"({p})" for p in _BLOCKED_URL_PATTERNS))
 
 
 def _safe_css_color(value: str | None) -> str:
@@ -35,10 +46,13 @@ def _safe_css_color(value: str | None) -> str:
 
 
 def _safe_css_url(value: str | None) -> str:
-    """Return value if it's a safe http/https URL, else fallback empty string."""
+    """Return value if it's a safe public http/https URL (no internal/cloud metadata), else fallback empty string."""
     if not value or not isinstance(value, str):
         return ""
-    return value if _SAFE_URL_RE.match(value.strip()) else ""
+    v = value.strip()
+    if not _SAFE_URL_RE.match(v) or _BLOCKED_URL_RE.search(v):
+        return ""
+    return v
 
 
 def _effective_design(design: CarouselDesign, overrides: dict) -> dict:
@@ -74,7 +88,8 @@ def _build_slide_html(
     if str(eff["background_type"]) == BackgroundTypeEnum.image.value and bg:
         safe_url = _safe_css_url(bg)
         if safe_url:
-            bg_style = f"background-image: url({html.escape(safe_url)}); background-size: cover;"
+            escaped_url = safe_url.replace("\\", "\\\\").replace("'", "\\'")
+            bg_style = f"background-image: url('{escaped_url}'); background-size: cover;"
         else:
             bg_style = "background-color: #FFFFFF;"
     else:
@@ -124,9 +139,40 @@ body {{ width: {SLIDE_WIDTH}px; height: {SLIDE_HEIGHT}px; overflow: hidden; font
 </html>"""
 
 
+async def _get_browser():
+    """Return shared Chromium browser instance (lazy init, used for export rendering)."""
+    global _playwright_cm, _shared_browser
+    async with _browser_lock:
+        if _shared_browser is not None:
+            return _shared_browser
+        _playwright_cm = async_playwright()
+        pw = await _playwright_cm.__aenter__()
+        _shared_browser = await pw.chromium.launch(
+            args=["--no-sandbox", "--disable-dev-shm-usage"]
+        )
+        return _shared_browser
+
+
+async def shutdown_browser() -> None:
+    """Close shared browser and playwright; call from app lifespan shutdown."""
+    global _playwright_cm, _shared_browser
+    async with _browser_lock:
+        if _shared_browser is not None:
+            await _shared_browser.close()
+            _shared_browser = None
+        if _playwright_cm is not None:
+            await _playwright_cm.__aexit__(None, None, None)
+            _playwright_cm = None
+
+
+async def _abort_route(route):
+    await route.abort()
+
+
 async def _screenshot_slide(browser, html_content: str) -> bytes:
     page = await browser.new_page(viewport={"width": SLIDE_WIDTH, "height": SLIDE_HEIGHT})
     try:
+        await page.route("**", _abort_route)
         await page.set_content(html_content, wait_until="domcontentloaded", timeout=5000)
         return await page.screenshot(type="png", timeout=10000)
     finally:
@@ -157,8 +203,6 @@ async def render_carousel_to_zip(
 
     design = carousel.design
     if design is None:
-        from app.models.enums import TemplateEnum
-
         design = CarouselDesign(
             carousel_id=carousel_id,
             template=TemplateEnum.classic,
@@ -178,24 +222,20 @@ async def render_carousel_to_zip(
     if not slides:
         raise ValueError(f"Carousel {carousel_id} has no slides")
 
+    browser = await _get_browser()
     png_list: list[bytes] = []
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(args=["--no-sandbox", "--disable-dev-shm-usage"])
-        try:
-            for i, slide in enumerate(slides):
-                html_str = _build_slide_html(
-                    title=slide.title,
-                    body=slide.body,
-                    footer=slide.footer,
-                    slide_index=i + 1,
-                    total_slides=len(slides),
-                    design=design,
-                    overrides=slide.design_overrides or {},
-                )
-                png_bytes = await _screenshot_slide(browser, html_str)
-                png_list.append(png_bytes)
-        finally:
-            await browser.close()
+    for i, slide in enumerate(slides):
+        html_str = _build_slide_html(
+            title=slide.title,
+            body=slide.body,
+            footer=slide.footer,
+            slide_index=i + 1,
+            total_slides=len(slides),
+            design=design,
+            overrides=slide.design_overrides or {},
+        )
+        png_bytes = await _screenshot_slide(browser, html_str)
+        png_list.append(png_bytes)
 
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as zf:

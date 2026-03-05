@@ -1,8 +1,8 @@
 """Assets API: upload files to S3/MinIO."""
 
 import io
-from typing import Set
 
+import filetype
 from botocore.exceptions import BotoCoreError, ClientError
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 
@@ -14,11 +14,11 @@ MAX_UPLOAD_SIZE = 50 * 1024 * 1024  # 50 MB
 
 ALLOWED_MIME_PREFIXES = ("image/", "video/", "font/")
 ALLOWED_MIME_EXACT = ("application/pdf",)
-BLOCKED_EXTENSIONS: Set[str] = {
+BLOCKED_EXTENSIONS: set[str] = {
     ".html", ".htm", ".svg", ".php", ".js", ".jsp", ".exe", ".bat",
     ".cmd", ".sh", ".vbs", ".ps1", ".cgi",
 }
-ALLOWED_EXTENSIONS: Set[str] = {
+ALLOWED_EXTENSIONS: set[str] = {
     ".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".ico",
     ".mp4", ".mov", ".avi", ".webm", ".mkv",
     ".woff", ".woff2", ".ttf", ".otf", ".eot",
@@ -30,7 +30,11 @@ def _get_storage() -> StorageService:
     return StorageService()
 
 
-def _validate_file(filename: str, content_type: str | None) -> None:
+def _validate_file(
+    filename: str,
+    content_type: str | None,
+    content: bytes | None = None,
+) -> None:
     ext = "." + filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext in BLOCKED_EXTENSIONS:
         raise HTTPException(status_code=400, detail="File type not allowed")
@@ -43,6 +47,18 @@ def _validate_file(filename: str, content_type: str | None) -> None:
         )
         if not allowed:
             raise HTTPException(status_code=400, detail="Content type not allowed")
+    if content:
+        kind = filetype.guess(content)
+        if kind is not None:
+            magic_ext = "." + kind.extension.lower()
+            magic_mime = kind.mime or ""
+            if magic_ext in BLOCKED_EXTENSIONS or magic_ext not in ALLOWED_EXTENSIONS:
+                raise HTTPException(status_code=400, detail="File type not allowed")
+            if not (
+                magic_mime.startswith(ALLOWED_MIME_PREFIXES)
+                or magic_mime in ALLOWED_MIME_EXACT
+            ):
+                raise HTTPException(status_code=400, detail="Content type not allowed")
 
 
 @router.post("/upload")
@@ -54,9 +70,9 @@ async def upload_asset(
     if not file.filename or not file.filename.strip():
         raise HTTPException(status_code=400, detail="Missing filename")
     filename = file.filename.strip()
-    _validate_file(filename, file.content_type)
 
     content = await file.read(MAX_UPLOAD_SIZE + 1)
+    _validate_file(filename, file.content_type, content)
     if len(content) > MAX_UPLOAD_SIZE:
         raise HTTPException(
             status_code=400,

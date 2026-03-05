@@ -48,7 +48,7 @@ async def _run_generation_task(generation_id: UUID) -> None:
                     "body": item.body,
                     "footer": item.footer,
                 }
-                for item in slides_result.root
+                for item in slides_result
             ]
             await slide_repo.delete_by_carousel_id(carousel.id)
             await slide_repo.create_for_carousel(carousel.id, slide_items)
@@ -58,7 +58,11 @@ async def _run_generation_task(generation_id: UUID) -> None:
                 tokens_used=tokens_used,
                 result=slide_items,
             )
-            await carousel_repo.update(carousel, status=CarouselStatusEnum.ready)
+            await carousel_repo.update(
+                carousel,
+                status=CarouselStatusEnum.ready,
+                slides_count=len(slide_items),
+            )
             await session.commit()
         except Exception as e:
             await session.rollback()

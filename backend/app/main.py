@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.core.config import get_settings
+from app.services.render_service import shutdown_browser
 from app.services.storage_service import StorageService
 
 
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI):
         storage = StorageService()
         await storage.ensure_bucket()
     yield
+    await shutdown_browser()
 
 
 app = FastAPI(

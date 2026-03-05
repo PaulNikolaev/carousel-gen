@@ -45,14 +45,19 @@ async def _run_export_task(export_id: UUID) -> None:
         except Exception as e:
             logger.exception("Export %s failed", export_id)
             await session.rollback()
-            export = await export_repo.get_by_id(export_id)
-            if export:
-                await export_repo.update(
-                    export,
-                    status=ExportStatusEnum.failed,
-                    error_message=str(e),
+            try:
+                export = await export_repo.get_by_id(export_id)
+                if export:
+                    await export_repo.update(
+                        export,
+                        status=ExportStatusEnum.failed,
+                        error_message=str(e),
+                    )
+                    await session.commit()
+            except Exception:
+                logger.exception(
+                    "Failed to persist failed status for export %s", export_id
                 )
-                await session.commit()
 
 
 class ExportService:

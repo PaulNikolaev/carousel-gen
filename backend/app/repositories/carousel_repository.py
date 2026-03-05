@@ -81,6 +81,7 @@ class CarouselRepository:
         format: dict | None = None,
         status: CarouselStatusEnum | None = None,
         source_payload: dict | None = None,
+        slides_count: int | None = None,
     ) -> Carousel:
         if title is not None:
             carousel.title = title
@@ -90,6 +91,8 @@ class CarouselRepository:
             carousel.status = status
         if source_payload is not None:
             carousel.source_payload = source_payload
+        if slides_count is not None:
+            carousel.slides_count = slides_count
         await self._session.flush()
         await self._session.refresh(carousel)
         return carousel

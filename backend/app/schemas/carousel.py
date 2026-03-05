@@ -27,7 +27,7 @@ class CarouselCreate(BaseModel):
     source_payload: dict = Field(default_factory=dict)
     format: FormatSchema = Field(default_factory=FormatSchema)
     language: str = "ru"
-    slides_count: int = 0
+    slides_count: int = Field(0, ge=0)
 
 
 class CarouselUpdate(BaseModel):

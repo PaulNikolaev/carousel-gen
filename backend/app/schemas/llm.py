@@ -19,3 +19,6 @@ class SlideGenerationItem(BaseModel):
 
 class SlideGenerationResult(RootModel[list[SlideGenerationItem]]):
     """Array of slide items from LLM, validated."""
+
+    def __iter__(self):
+        return iter(self.root)
