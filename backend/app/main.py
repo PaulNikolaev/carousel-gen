@@ -7,7 +7,10 @@ from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.core.config import get_settings
+from app.core.logging_config import configure_structlog
 from app.middleware.api_key import APIKeyMiddleware
+from app.middleware.correlation_id import CorrelationIdMiddleware
+from app.middleware.request_logging import RequestLoggingMiddleware
 from app.services.render_service import shutdown_browser
 from app.services.storage_service import StorageService
 
@@ -55,6 +58,7 @@ async def validation_exception_handler(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    configure_structlog()
     settings = get_settings()
     if settings.S3_BUCKET:
         storage = StorageService()
@@ -84,6 +88,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(APIKeyMiddleware)
+app.add_middleware(RequestLoggingMiddleware)
+app.add_middleware(CorrelationIdMiddleware)
 
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)

@@ -1,8 +1,9 @@
 """Generation business logic: start with BackgroundTask, run LLM, persist slides."""
 
-import logging
+import time
 from uuid import UUID
 
+import structlog
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,10 +17,12 @@ from app.repositories.slide_repository import SlideRepository
 from app.schemas.generation import StartGenerationResponse
 from app.services.llm_service import generate_slides
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 async def _run_generation_task(generation_id: UUID) -> None:
+    started_at = time.perf_counter()
+
     async with async_session_factory() as session:
         gen_repo = GenerationRepository(session)
         slide_repo = SlideRepository(session)
@@ -29,6 +32,10 @@ async def _run_generation_task(generation_id: UUID) -> None:
             if not gen or not gen.carousel:
                 return
             carousel = gen.carousel
+            log = logger.bind(
+                generation_id=str(generation_id), carousel_id=str(carousel.id)
+            )
+            log.info("generation_started")
             await gen_repo.update(gen, status=GenerationStatusEnum.running)
 
             style_hint = None
@@ -64,15 +71,23 @@ async def _run_generation_task(generation_id: UUID) -> None:
                 slides_count=len(slide_items),
             )
             await session.commit()
+            duration_ms = (time.perf_counter() - started_at) * 1000
+            log.info(
+                "generation_finished",
+                tokens_used=tokens_used,
+                duration_ms=round(duration_ms, 2),
+            )
         except Exception as e:
             await session.rollback()
-            logger.exception("Generation %s failed", generation_id)
+            duration_ms = (time.perf_counter() - started_at) * 1000
+            carousel_id = None
             try:
                 async with async_session_factory() as session2:
                     gen_repo2 = GenerationRepository(session2)
                     carousel_repo2 = CarouselRepository(session2)
                     gen = await gen_repo2.get_by_id(generation_id, load_carousel=True)
                     if gen:
+                        carousel_id = str(gen.carousel_id) if gen.carousel_id else None
                         await gen_repo2.update(
                             gen,
                             status=GenerationStatusEnum.failed,
@@ -83,10 +98,21 @@ async def _run_generation_task(generation_id: UUID) -> None:
                                 gen.carousel, status=CarouselStatusEnum.failed
                             )
                     await session2.commit()
-            except Exception:
-                logger.exception(
-                    "Failed to persist failed status for generation %s", generation_id
+            except Exception as inner_exc:
+                logger.warning(
+                    "generation_status_update_failed",
+                    generation_id=str(generation_id),
+                    inner_error=repr(inner_exc),
                 )
+            log = logger.bind(
+                generation_id=str(generation_id),
+                carousel_id=carousel_id,
+            )
+            log.error(
+                "generation_failed",
+                error=repr(e),
+                duration_ms=round(duration_ms, 2),
+            )
 
 
 class GenerationService:

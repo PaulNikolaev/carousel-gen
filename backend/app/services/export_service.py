@@ -1,8 +1,9 @@
 """Export business logic: start with BackgroundTask, render to ZIP, upload to S3."""
 
-import logging
+import time
 from uuid import UUID
 
+import structlog
 from fastapi import BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,15 +17,20 @@ from app.schemas.export import StartExportResponse
 from app.services.render_service import render_carousel_to_zip
 from app.services.storage_service import StorageService
 
-logger = logging.getLogger(__name__)
+logger = structlog.get_logger()
 
 
 async def _run_export_task(export_id: UUID) -> None:
+    started_at = time.perf_counter()
+
     async with async_session_factory() as session:
         export_repo = ExportRepository(session)
         export = await export_repo.get_by_id(export_id)
         if not export:
             return
+        carousel_id = str(export.carousel_id)
+        log = logger.bind(export_id=str(export_id), carousel_id=carousel_id)
+        log.info("export_started")
         await export_repo.update(export, status=ExportStatusEnum.running)
         await session.commit()
 
@@ -42,22 +48,30 @@ async def _run_export_task(export_id: UUID) -> None:
                 s3_key=s3_key,
             )
             await session.commit()
+            duration_ms = (time.perf_counter() - started_at) * 1000
+            log.info(
+                "export_finished",
+                duration_ms=round(duration_ms, 2),
+            )
         except Exception as e:
-            logger.exception("Export %s failed", export_id)
             await session.rollback()
+            duration_ms = (time.perf_counter() - started_at) * 1000
+            log.error(
+                "export_failed",
+                error=repr(e),
+                duration_ms=round(duration_ms, 2),
+            )
             try:
                 export = await export_repo.get_by_id(export_id)
                 if export:
                     await export_repo.update(
                         export,
                         status=ExportStatusEnum.failed,
-                        error_message=str(e),
+                        error_message=repr(e),
                     )
                     await session.commit()
             except Exception:
-                logger.exception(
-                    "Failed to persist failed status for export %s", export_id
-                )
+                pass
 
 
 class ExportService:

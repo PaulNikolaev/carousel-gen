@@ -4,6 +4,7 @@ import json
 from typing import Any
 
 import httpx
+import structlog
 from pydantic import ValidationError
 from tenacity import (
     retry,
@@ -14,6 +15,19 @@ from tenacity import (
 
 from app.core.config import get_settings
 from app.schemas.llm import BODY_MAX, SlideGenerationResult, TITLE_MAX
+
+_logger = structlog.get_logger()
+
+
+def _log_llm_retry(retry_state) -> None:
+    if retry_state.outcome is None or retry_state.outcome.failed is False:
+        return
+    exc = retry_state.outcome.exception()
+    _logger.warning(
+        "llm_call_error",
+        attempt=retry_state.attempt_number,
+        error=str(exc) if exc else "unknown",
+    )
 
 
 def _source_content_from_payload(source_payload: dict[str, Any]) -> str:
@@ -80,6 +94,7 @@ def _parse_and_validate(content: str) -> SlideGenerationResult:
     stop=stop_after_attempt(3),
     wait=wait_exponential(multiplier=1, min=1, max=10),
     reraise=True,
+    before_sleep=_log_llm_retry,
 )
 async def _call_llm_parse_and_validate(prompt: str) -> tuple[SlideGenerationResult, int]:
     content, total_tokens = await _call_llm(prompt)
