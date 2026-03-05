@@ -70,40 +70,117 @@
         </button>
       </template>
 
-      <!-- Editor placeholder (ready) -->
+      <!-- Editor: thumbnails | preview (4:5) | settings -->
       <template v-else-if="viewMode === 'editor'">
-        <h1 class="mb-4 text-2xl font-bold text-gray-900">
-          Редактор
-        </h1>
-        <div class="flex flex-col gap-4">
-          <p v-if="editorSlidesLoading" class="text-gray-500">
-            Загрузка слайдов…
-          </p>
-          <template v-else>
-            <p class="text-gray-600">
-              Слайды ({{ editorSlides.length }}):
-            </p>
-            <ul class="list-inside list-disc space-y-1 text-gray-700">
-              <li v-for="s in editorSlides" :key="s.order">
-                {{ s.title || `Слайд ${s.order}` }}
-              </li>
-            </ul>
-          </template>
+        <div class="mb-4 flex items-center justify-between gap-4">
+          <h1 class="text-2xl font-bold text-gray-900">
+            Редактор
+          </h1>
+          <NuxtLink
+            to="/"
+            class="text-accent font-medium transition-colors hover:text-accent/90"
+          >
+            Готово
+          </NuxtLink>
+        </div>
+        <p v-if="editorSlidesLoading" class="text-gray-500">
+          Загрузка слайдов…
+        </p>
+        <div
+          v-else
+          class="grid gap-4"
+          style="grid-template-columns: minmax(0, 120px) minmax(0, 1fr) minmax(0, 280px);"
+        >
+          <!-- Left: thumbnails -->
+          <div class="flex flex-col gap-2 overflow-y-auto">
+            <button
+              v-for="(s, idx) in editorSlides"
+              :key="s.id"
+              type="button"
+              class="slide-thumb flex shrink-0 overflow-hidden rounded border-2 transition-colors"
+              :class="currentSlideIndex === idx ? 'border-primary bg-primary/5' : 'border-gray-200 hover:border-gray-300'"
+              :aria-label="`Слайд ${s.order}`"
+              :aria-pressed="currentSlideIndex === idx"
+              style="aspect-ratio: 4/5; max-height: 120px;"
+              @click="currentSlideIndex = idx"
+            >
+              <SlidePreview
+                :slide="{ title: s.title, body: s.body, footer: s.footer }"
+                :design="editorDesignThumb"
+                :slide-index="s.order"
+                :total-slides="editorSlides.length"
+                class="!h-full !w-full !rounded-none !border-0"
+              />
+            </button>
+          </div>
+          <!-- Center: current slide preview (4:5) -->
+          <div class="flex min-h-0 items-start justify-center">
+            <div class="w-full max-w-md">
+              <template v-if="currentSlide">
+                <SlidePreview
+                  :slide="{ title: currentSlide.title, body: currentSlide.body, footer: currentSlide.footer }"
+                  :design="editorDesign"
+                  :slide-index="currentSlide.order"
+                  :total-slides="editorSlides.length"
+                />
+              </template>
+            </div>
+          </div>
+          <!-- Right: settings + edit fields -->
+          <aside class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+            <h2 class="text-sm font-semibold text-gray-900">
+              Настройки
+            </h2>
+            <template v-if="currentSlide">
+              <div class="flex flex-col gap-1">
+                <label for="edit-title" class="text-xs font-medium text-gray-600">Заголовок</label>
+                <textarea
+                  id="edit-title"
+                  :value="editTitle"
+                  rows="2"
+                  class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  @input="onEditTitle"
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label for="edit-body" class="text-xs font-medium text-gray-600">Текст</label>
+                <textarea
+                  id="edit-body"
+                  :value="editBody"
+                  rows="4"
+                  class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  @input="onEditBody"
+                />
+              </div>
+              <div class="flex flex-col gap-1">
+                <label for="edit-footer" class="text-xs font-medium text-gray-600">Подвал</label>
+                <input
+                  id="edit-footer"
+                  :value="editFooter"
+                  type="text"
+                  class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                  @input="onEditFooter"
+                />
+              </div>
+            </template>
+          </aside>
         </div>
       </template>
     </template>
 
-    <div v-else-if="!carousel && !loadError" class="text-gray-500">
+    <div v-else class="text-gray-500">
       Загрузка…
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
+import { DEFAULT_DESIGN } from "~/types/design";
+import type { DesignSnapshot } from "~/types/design";
+import type { SlideResponse, SlideUpdate } from "~/types/slide";
 import type { CarouselResponse } from "~/types/carousel";
 import type {
   GenerationResponse,
-  GenerationSlideItem,
   StartGenerationResponse,
 } from "~/types/generation";
 
@@ -120,8 +197,14 @@ const starting = ref(false);
 const tokensEstimate = ref<number | null>(null);
 const activeGenerationId = ref<string | null>(null);
 const generation = ref<GenerationResponse | null>(null);
-const editorSlides = ref<GenerationSlideItem[]>([]);
+const editorSlides = ref<SlideResponse[]>([]);
 const editorSlidesLoading = ref(false);
+const currentSlideIndex = ref(0);
+const editorDesign = ref<DesignSnapshot>({ ...DEFAULT_DESIGN });
+const editorDesignThumb = computed(() => ({ ...editorDesign.value, padding: 8 }));
+
+const DEBOUNCE_MS = 500;
+let debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
 
 const POLL_INTERVAL_MS = 3000;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -151,6 +234,76 @@ const progressStatusText = computed(() => {
 const failedMessage = computed(() => {
   return generation.value?.error_message || "Генерация не удалась.";
 });
+
+const currentSlide = computed(() => {
+  const list = editorSlides.value;
+  const idx = currentSlideIndex.value;
+  if (!list.length || idx < 0 || idx >= list.length) return null;
+  return list[idx];
+});
+
+const editTitle = ref("");
+const editBody = ref("");
+const editFooter = ref("");
+
+function syncEditFieldsFromSlide() {
+  const s = currentSlide.value;
+  if (s) {
+    editTitle.value = s.title;
+    editBody.value = s.body;
+    editFooter.value = s.footer;
+  } else {
+    editTitle.value = "";
+    editBody.value = "";
+    editFooter.value = "";
+  }
+}
+
+watch(currentSlide, syncEditFieldsFromSlide, { immediate: true });
+
+async function patchSlide(payload: SlideUpdate) {
+  const s = currentSlide.value;
+  if (!s) return;
+  try {
+    const updated = await request<SlideResponse>(
+      `/api/v1/carousels/${id.value}/slides/${s.id}`,
+      { method: "PATCH", body: payload }
+    );
+    const list = [...editorSlides.value];
+    const idx = editorSlides.value.findIndex((x) => x.id === s.id);
+    if (idx !== -1) list[idx] = updated;
+    editorSlides.value = list;
+  } catch {
+    // useApi shows toast
+  }
+}
+
+function schedulePatch(field: "title" | "body" | "footer", getPayload: () => SlideUpdate) {
+  const key = `${currentSlide.value?.id ?? ""}-${field}`;
+  if (debounceTimers[key]) clearTimeout(debounceTimers[key]);
+  debounceTimers[key] = setTimeout(() => {
+    patchSlide(getPayload());
+    delete debounceTimers[key];
+  }, DEBOUNCE_MS);
+}
+
+function onEditTitle(e: Event) {
+  const v = (e.target as HTMLTextAreaElement).value;
+  editTitle.value = v;
+  schedulePatch("title", () => ({ title: v }));
+}
+
+function onEditBody(e: Event) {
+  const v = (e.target as HTMLTextAreaElement).value;
+  editBody.value = v;
+  schedulePatch("body", () => ({ body: v }));
+}
+
+function onEditFooter(e: Event) {
+  const v = (e.target as HTMLInputElement).value;
+  editFooter.value = v;
+  schedulePatch("footer", () => ({ footer: v }));
+}
 
 async function fetchCarousel() {
   loadError.value = null;
@@ -192,10 +345,10 @@ async function pollGeneration() {
       `/api/v1/generations/${activeGenerationId.value}`
     );
     generation.value = gen;
-    if (gen.status === "done" && gen.result?.length) {
-      editorSlides.value = [...gen.result];
+    if (gen.status === "done") {
       stopPolling();
       await fetchCarousel();
+      await ensureEditorSlides();
     } else if (gen.status === "failed") {
       stopPolling();
       await fetchCarousel();
@@ -220,15 +373,15 @@ function stopPolling() {
 }
 
 async function ensureEditorSlides() {
-  if (editorSlides.value.length) return;
   editorSlidesLoading.value = true;
   try {
-    const slides = await request<GenerationSlideItem[]>(
+    const slides = await request<SlideResponse[]>(
       `/api/v1/carousels/${id.value}/slides`
     );
     editorSlides.value = slides;
+    if (currentSlideIndex.value >= slides.length) currentSlideIndex.value = Math.max(0, slides.length - 1);
   } catch {
-    // keep empty
+    editorSlides.value = [];
   } finally {
     editorSlidesLoading.value = false;
   }
@@ -284,5 +437,6 @@ onMounted(() => {
 onUnmounted(() => {
   stopPolling();
   stopCarouselPolling();
+  Object.values(debounceTimers).forEach(clearTimeout);
 });
 </script>
