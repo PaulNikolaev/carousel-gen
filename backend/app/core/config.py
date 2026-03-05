@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     S3_BUCKET: str = ""
     S3_ACCESS_KEY: str = ""
     S3_SECRET_KEY: SecretStr = SecretStr("")
+    S3_PUBLIC_BASE_URL: str = ""
     LLM_API_KEY: SecretStr = SecretStr("")
     LLM_BASE_URL: str = ""
     LLM_MODEL: str = ""

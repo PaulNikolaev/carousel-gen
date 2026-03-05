@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -5,6 +7,7 @@ from fastapi.responses import JSONResponse
 
 from app.api import api_router
 from app.core.config import get_settings
+from app.services.storage_service import StorageService
 
 
 def _error_response(detail: str | list, code: int) -> JSONResponse:
@@ -29,10 +32,20 @@ async def validation_exception_handler(
     return _error_response(detail=exc.errors(), code=422)
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    settings = get_settings()
+    if settings.S3_BUCKET:
+        storage = StorageService()
+        await storage.ensure_bucket()
+    yield
+
+
 app = FastAPI(
     title="Carousel Generator API",
     version="0.1.0",
     description="API для генерации LinkedIn-каруселей.",
+    lifespan=lifespan,
 )
 
 _allowed_origins = [

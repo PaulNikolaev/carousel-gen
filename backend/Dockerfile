@@ -16,6 +16,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir --user -r requirements.txt
 
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir --user -r requirements-dev.txt
+
 # Runtime stage
 FROM python:3.12-slim
 

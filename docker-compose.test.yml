@@ -15,7 +15,7 @@ services:
       timeout: 3s
       retries: 5
 
-  backend:
+  migrate:
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -24,7 +24,18 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    entrypoint: ["sh", "-c", "alembic upgrade head && exec \"$@\""]
+    entrypoint: ["alembic", "upgrade", "head"]
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    env_file:
+      - backend/.env.test
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    entrypoint: ["sh", "-c", "alembic upgrade head && exec \"$0\" \"$@\""]
     command: ["python", "-m", "pytest", "tests", "-v"]
 
 volumes:

@@ -2,51 +2,80 @@
 
 ## Запуск проекта
 
-1. Подготовка: скопируйте `backend/.env.example` в `backend/.env` и при необходимости заполните переменные.
-2. Запуск: `docker compose up` (или `docker compose up --build`).
-3. Миграции БД применяются при старте backend (entrypoint).
+1. Скопируйте `backend/.env.example` в `backend/.env`, при необходимости заполните переменные.
 
-Порты:
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
 
-- backend: 8000
-- frontend: 3000
-- postgres: 5432
-- minio: 9000 (API), 9001 (консоль)
+   PowerShell:
+
+   ```powershell
+   Copy-Item backend\.env.example backend\.env
+   ```
+
+2. Запуск:
+
+   ```bash
+   docker compose up --build
+   ```
+
+3. Миграции БД применяются при старте backend.
+
+| Сервис   | Адрес |
+|----------|-------|
+| Backend  | http://localhost:8000 |
+| Swagger  | http://localhost:8000/docs |
+| Frontend | http://localhost:3000 |
+| Postgres | localhost:5432 |
+| MinIO API | http://localhost:9000 |
+| MinIO консоль | http://localhost:9001 |
 
 ## Тестирование
 
-Тесты используют отдельную инфраструктуру и БД `carousel_test`.
+Тесты используют БД `carousel_test` и `docker-compose.test.yml`. Сервис `migrate` применяет миграции (`alembic upgrade head`) при старте.
 
-### Запуск тестов в Docker (рекомендуется)
+1. Скопируйте шаблон тестового окружения:
 
-1. Подготовка: скопируйте шаблон тестового окружения:
    ```bash
    cp backend/.env.test.example backend/.env.test
    ```
-2. Запуск тестовых сервисов (PostgreSQL для тестов):
-   ```bash
-   docker compose -f docker-compose.test.yml up -d postgres
+
+   PowerShell:
+
+   ```powershell
+   Copy-Item backend\.env.test.example backend\.env.test
    ```
-3. Запуск pytest:
+
+2. Поднимите стек и запустите тесты:
+
    ```bash
+   docker compose -f docker-compose.test.yml up -d
    docker compose -f docker-compose.test.yml run --rm backend
    ```
-   (В `docker-compose.test.yml` для сервиса backend уже задана команда `python -m pytest tests -v`.)
-4. Завершение:
+
+   При `up -d` поднимается postgres, сервис `migrate` выполняет `alembic upgrade head` и завершается; при необходимости тесты запускают отдельно через `run --rm backend`.
+
+3. Остановка:
+
    ```bash
    docker compose -f docker-compose.test.yml down
    ```
 
-### Локальный запуск pytest (без полного Docker-окружения)
+## Локальный запуск pytest
 
 1. `cd backend`
-2. Скопируйте `backend/.env.test.example` в `backend/.env.test` и при необходимости отредактируйте.
-3. Установите зависимости: `pip install -r requirements.txt -r requirements-dev.txt`
-4. Поднимите только тестовый Postgres: `docker compose -f docker-compose.test.yml up -d postgres`
-5. В `backend/.env.test` задайте подключение к БД на хосте, например:
-   `DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/carousel_test`
-   (порт 5433 — маппинг тестового контейнера postgres.)
-6. Примените миграции: `alembic upgrade head`
-7. Запуск тестов: `python -m pytest tests -v`
+2. Скопируйте `backend/.env.test.example` в `backend/.env.test`, в нём укажите `DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/carousel_test`.
+3. Установите зависимости и поднимите тестовый Postgres:
 
-Файл `backend/.env.test` в репозиторий не коммитится; в репозитории хранится только шаблон `backend/.env.test.example`.
+   ```bash
+   pip install -r requirements.txt -r requirements-dev.txt
+   docker compose -f docker-compose.test.yml up -d postgres
+   ```
+
+4. Миграции и тесты:
+
+   ```bash
+   alembic upgrade head
+   python -m pytest tests -v
+   ```
