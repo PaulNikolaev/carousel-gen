@@ -15,6 +15,7 @@ from app.models.enums import CarouselStatusEnum, SourceTypeEnum
 
 if TYPE_CHECKING:
     from app.models.carousel_design import CarouselDesign
+    from app.models.export import Export
     from app.models.generation import Generation
     from app.models.slide import Slide
 
@@ -72,5 +73,10 @@ class Carousel(Base):
         "CarouselDesign",
         back_populates="carousel",
         uselist=False,
+        cascade="all, delete-orphan",
+    )
+    exports: Mapped[list[Export]] = relationship(
+        "Export",
+        back_populates="carousel",
         cascade="all, delete-orphan",
     )

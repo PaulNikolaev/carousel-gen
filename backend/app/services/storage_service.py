@@ -121,6 +121,19 @@ class StorageService:
             url = await self.generate_presigned_url(key, bucket=b, expires_in=604800)
         return url, key
 
+    async def upload_fileobj_with_key(
+        self,
+        file_obj: IO[bytes],
+        key: str,
+        content_type: str = "application/zip",
+        bucket: str | None = None,
+    ) -> None:
+        """Upload bytes from file_obj to S3 under the given key."""
+        b = bucket or self._bucket
+        await asyncio.to_thread(
+            _sync_upload, self._client, file_obj, b, key, content_type
+        )
+
     async def generate_presigned_url(
         self,
         key: str,

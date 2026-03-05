@@ -6,10 +6,12 @@ from app.models.carousel_design import CarouselDesign
 from app.models.enums import (
     BackgroundTypeEnum,
     CarouselStatusEnum,
+    ExportStatusEnum,
     GenerationStatusEnum,
     SourceTypeEnum,
     TemplateEnum,
 )
+from app.models.export import Export
 from app.models.generation import Generation
 from app.models.slide import Slide
 
@@ -17,10 +19,12 @@ __all__ = [
     "Base",
     "Carousel",
     "CarouselDesign",
+    "Export",
     "Generation",
     "Slide",
     "SourceTypeEnum",
     "CarouselStatusEnum",
+    "ExportStatusEnum",
     "GenerationStatusEnum",
     "TemplateEnum",
     "BackgroundTypeEnum",

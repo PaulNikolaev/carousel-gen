@@ -32,3 +32,10 @@ class GenerationStatusEnum(str, enum.Enum):
     running = "running"
     done = "done"
     failed = "failed"
+
+
+class ExportStatusEnum(str, enum.Enum):
+    pending = "pending"
+    running = "running"
+    done = "done"
+    failed = "failed"
