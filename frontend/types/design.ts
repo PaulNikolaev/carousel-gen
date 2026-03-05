@@ -14,6 +14,28 @@ export interface DesignSnapshot {
   footer_text: string;
 }
 
+/** Partial payload for PATCH /api/v1/carousels/{id}/design. */
+export interface DesignUpdate {
+  template?: DesignSnapshot["template"];
+  background?: {
+    type?: DesignSnapshot["background_type"];
+    value?: string;
+    overlay?: number;
+  };
+  layout?: {
+    padding?: number;
+    alignment_h?: DesignSnapshot["alignment_h"];
+    alignment_v?: DesignSnapshot["alignment_v"];
+  };
+  header?: { enabled?: boolean; text?: string };
+  footer?: { enabled?: boolean; text?: string };
+}
+
+/** Response from GET /api/v1/carousels/{id}/design. */
+export interface DesignResponse {
+  design: DesignSnapshot;
+}
+
 /** Default design when backend has no GET design endpoint (step 7.2). */
 export const DEFAULT_DESIGN: DesignSnapshot = {
   template: "classic",
@@ -28,3 +50,12 @@ export const DEFAULT_DESIGN: DesignSnapshot = {
   footer_enabled: true,
   footer_text: "",
 };
+
+/** Response from PATCH .../design (carousel + design snapshot). */
+export interface CarouselWithDesignResponse {
+  id: string;
+  title: string;
+  status: string;
+  design: DesignSnapshot;
+  [key: string]: unknown;
+}

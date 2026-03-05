@@ -4,6 +4,12 @@
     :class="templateClass"
     :style="containerStyle"
   >
+    <div
+      v-if="design.background_type === 'image' && design.overlay > 0"
+      class="slide-preview__overlay"
+      :style="{ background: `rgba(0,0,0,${design.overlay})` }"
+      aria-hidden="true"
+    />
     <header
       v-if="design.header_enabled"
       class="slide-preview__header flex shrink-0 items-center justify-between py-2 text-[10px] opacity-90"
@@ -74,6 +80,7 @@ const containerStyle = computed(() => {
     background: bg,
     backgroundSize: "cover",
     backgroundPosition: "center",
+    position: "relative",
   };
 });
 
@@ -91,9 +98,16 @@ const contentAlignStyle = computed(() => {
       : d.alignment_h === "right"
         ? "flex-end"
         : "center";
+  const textAlign =
+    d.alignment_h === "left"
+      ? "left"
+      : d.alignment_h === "right"
+        ? "right"
+        : "center";
   return {
     justifyContent: justify,
     alignItems: align,
+    textAlign,
   };
 });
 </script>
@@ -101,6 +115,21 @@ const contentAlignStyle = computed(() => {
 <style scoped>
 .slide-preview {
   letter-spacing: 0.01em;
+  position: relative;
+}
+
+.slide-preview__overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.slide-preview__header,
+.slide-preview__content,
+.slide-preview__footer {
+  position: relative;
+  z-index: 1;
 }
 
 .slide-preview--classic {

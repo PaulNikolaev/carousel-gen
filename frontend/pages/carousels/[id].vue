@@ -126,43 +126,53 @@
               </template>
             </div>
           </div>
-          <!-- Right: settings + edit fields -->
+          <!-- Right: design panel + slide edit fields -->
           <aside class="flex flex-col gap-4 rounded-lg border border-gray-200 bg-gray-50/50 p-4">
             <h2 class="text-sm font-semibold text-gray-900">
               Настройки
             </h2>
-            <template v-if="currentSlide">
-              <div class="flex flex-col gap-1">
-                <label for="edit-title" class="text-xs font-medium text-gray-600">Заголовок</label>
-                <textarea
-                  id="edit-title"
-                  :value="editTitle"
-                  rows="2"
-                  class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  @input="onEditTitle"
-                />
-              </div>
-              <div class="flex flex-col gap-1">
-                <label for="edit-body" class="text-xs font-medium text-gray-600">Текст</label>
-                <textarea
-                  id="edit-body"
-                  :value="editBody"
-                  rows="4"
-                  class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  @input="onEditBody"
-                />
-              </div>
-              <div class="flex flex-col gap-1">
-                <label for="edit-footer" class="text-xs font-medium text-gray-600">Подвал</label>
-                <input
-                  id="edit-footer"
-                  :value="editFooter"
-                  type="text"
-                  class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-                  @input="onEditFooter"
-                />
-              </div>
-            </template>
+            <DesignPanel
+              :design="editorDesign"
+              @update="onDesignUpdate"
+              @apply-to-all="onDesignApplyToAll"
+            />
+            <div class="border-t border-gray-200 pt-3">
+              <h3 class="mb-2 text-xs font-semibold text-gray-700">
+                Текст слайда
+              </h3>
+              <template v-if="currentSlide">
+                <div class="flex flex-col gap-1">
+                  <label for="edit-title" class="text-xs font-medium text-gray-600">Заголовок</label>
+                  <textarea
+                    id="edit-title"
+                    :value="editTitle"
+                    rows="2"
+                    class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    @input="onEditTitle"
+                  />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label for="edit-body" class="text-xs font-medium text-gray-600">Текст</label>
+                  <textarea
+                    id="edit-body"
+                    :value="editBody"
+                    rows="4"
+                    class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    @input="onEditBody"
+                  />
+                </div>
+                <div class="flex flex-col gap-1">
+                  <label for="edit-footer" class="text-xs font-medium text-gray-600">Подвал</label>
+                  <input
+                    id="edit-footer"
+                    :value="editFooter"
+                    type="text"
+                    class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                    @input="onEditFooter"
+                  />
+                </div>
+              </template>
+            </div>
           </aside>
         </div>
       </template>
@@ -176,7 +186,12 @@
 
 <script setup lang="ts">
 import { DEFAULT_DESIGN } from "~/types/design";
-import type { DesignSnapshot } from "~/types/design";
+import type {
+  CarouselWithDesignResponse,
+  DesignResponse,
+  DesignSnapshot,
+  DesignUpdate,
+} from "~/types/design";
 import type { SlideResponse, SlideUpdate } from "~/types/slide";
 import type { CarouselResponse } from "~/types/carousel";
 import type {
@@ -204,7 +219,10 @@ const editorDesign = ref<DesignSnapshot>({ ...DEFAULT_DESIGN });
 const editorDesignThumb = computed(() => ({ ...editorDesign.value, padding: 8 }));
 
 const DEBOUNCE_MS = 500;
+const DESIGN_DEBOUNCE_MS = 800;
 let debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {};
+let designDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+const pendingDesignPatch = ref<DesignUpdate>({});
 
 const POLL_INTERVAL_MS = 3000;
 let pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -260,6 +278,120 @@ function syncEditFieldsFromSlide() {
 }
 
 watch(currentSlide, syncEditFieldsFromSlide, { immediate: true });
+
+function mergeDesignUpdate(prev: DesignUpdate, next: DesignUpdate): DesignUpdate {
+  return {
+    template: next.template ?? prev.template,
+    background:
+      next.background || prev.background
+        ? {
+            type: next.background?.type ?? prev.background?.type,
+            value: next.background?.value ?? prev.background?.value,
+            overlay: next.background?.overlay ?? prev.background?.overlay,
+          }
+        : undefined,
+    layout:
+      next.layout || prev.layout
+        ? {
+            padding: next.layout?.padding ?? prev.layout?.padding,
+            alignment_h: next.layout?.alignment_h ?? prev.layout?.alignment_h,
+            alignment_v: next.layout?.alignment_v ?? prev.layout?.alignment_v,
+          }
+        : undefined,
+    header:
+      next.header || prev.header
+        ? {
+            enabled: next.header?.enabled ?? prev.header?.enabled,
+            text: next.header?.text ?? prev.header?.text,
+          }
+        : undefined,
+    footer:
+      next.footer || prev.footer
+        ? {
+            enabled: next.footer?.enabled ?? prev.footer?.enabled,
+            text: next.footer?.text ?? prev.footer?.text,
+          }
+        : undefined,
+  };
+}
+
+function applyDesignUpdate(snapshot: DesignSnapshot, update: DesignUpdate): DesignSnapshot {
+  return {
+    template: update.template ?? snapshot.template,
+    background_type: update.background?.type ?? snapshot.background_type,
+    background_value: update.background?.value ?? snapshot.background_value,
+    overlay: update.background?.overlay ?? snapshot.overlay,
+    padding: update.layout?.padding ?? snapshot.padding,
+    alignment_h: update.layout?.alignment_h ?? snapshot.alignment_h,
+    alignment_v: update.layout?.alignment_v ?? snapshot.alignment_v,
+    header_enabled: update.header?.enabled ?? snapshot.header_enabled,
+    header_text: update.header?.text ?? snapshot.header_text,
+    footer_enabled: update.footer?.enabled ?? snapshot.footer_enabled,
+    footer_text: update.footer?.text ?? snapshot.footer_text,
+  };
+}
+
+function designSnapshotToUpdate(s: DesignSnapshot): DesignUpdate {
+  return {
+    template: s.template,
+    background: { type: s.background_type, value: s.background_value, overlay: s.overlay },
+    layout: { padding: s.padding, alignment_h: s.alignment_h, alignment_v: s.alignment_v },
+    header: { enabled: s.header_enabled, text: s.header_text },
+    footer: { enabled: s.footer_enabled, text: s.footer_text },
+  };
+}
+
+async function fetchDesign() {
+  try {
+    const res = await request<DesignResponse>(
+      `/api/v1/carousels/${id.value}/design`
+    );
+    editorDesign.value = { ...res.design };
+  } catch {
+    // useApi shows toast; keep current editorDesign to avoid overwriting with defaults
+  }
+}
+
+async function patchDesign(payload: DesignUpdate, applyToAll: boolean) {
+  try {
+    const url = `/api/v1/carousels/${id.value}/design${applyToAll ? "?apply_to_all=true" : ""}`;
+    const data = await request<CarouselWithDesignResponse>(url, {
+      method: "PATCH",
+      body: payload,
+    });
+    // Only sync server response when no pending local changes to avoid overwriting in-flight edits
+    const hasPending =
+      designDebounceTimer !== null ||
+      Object.keys(pendingDesignPatch.value).length > 0;
+    if (!hasPending) {
+      editorDesign.value = { ...data.design };
+    }
+  } catch {
+    // useApi shows toast
+  }
+}
+
+function onDesignUpdate(partial: DesignUpdate) {
+  editorDesign.value = applyDesignUpdate(editorDesign.value, partial);
+  pendingDesignPatch.value = mergeDesignUpdate(pendingDesignPatch.value, partial);
+  if (designDebounceTimer) clearTimeout(designDebounceTimer);
+  designDebounceTimer = setTimeout(() => {
+    const payload = { ...pendingDesignPatch.value };
+    pendingDesignPatch.value = {};
+    designDebounceTimer = null;
+    patchDesign(payload, false);
+  }, DESIGN_DEBOUNCE_MS);
+}
+
+function onDesignApplyToAll() {
+  if (designDebounceTimer) {
+    clearTimeout(designDebounceTimer);
+    designDebounceTimer = null;
+  }
+  const payload = designSnapshotToUpdate(editorDesign.value);
+  pendingDesignPatch.value = {};
+  patchDesign(payload, true);
+}
 
 async function patchSlide(payload: SlideUpdate) {
   const s = currentSlide.value;
@@ -389,8 +521,10 @@ async function ensureEditorSlides() {
 
 watch(
   () => viewMode.value,
-  (mode) => {
-    if (mode === "editor") ensureEditorSlides();
+  async (mode) => {
+    if (mode === "editor") {
+      await Promise.all([ensureEditorSlides(), fetchDesign()]);
+    }
   },
   { immediate: true }
 );
@@ -438,5 +572,6 @@ onUnmounted(() => {
   stopPolling();
   stopCarouselPolling();
   Object.values(debounceTimers).forEach(clearTimeout);
+  if (designDebounceTimer) clearTimeout(designDebounceTimer);
 });
 </script>

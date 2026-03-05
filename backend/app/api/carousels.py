@@ -18,7 +18,7 @@ from app.schemas.carousel import (
     CarouselUpdate,
     CarouselWithDesignResponse,
 )
-from app.schemas.design import DesignUpdate
+from app.schemas.design import DesignResponse, DesignUpdate
 from app.services.carousel_service import CarouselService
 from app.services.design_service import DesignService
 from app.services.storage_service import StorageService
@@ -115,6 +115,20 @@ async def update_carousel(
     if carousel is None:
         raise HTTPException(status_code=404, detail="Carousel not found")
     return carousel
+
+
+@router.get(
+    "/{carousel_id:uuid}/design",
+    response_model=DesignResponse,
+)
+async def get_carousel_design(
+    carousel_id: UUID,
+    service: DesignService = Depends(_get_design_service),
+) -> DesignResponse:
+    result = await service.get_design(carousel_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Carousel not found")
+    return result
 
 
 @router.patch(

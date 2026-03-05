@@ -11,7 +11,7 @@ from app.models.enums import BackgroundTypeEnum, TemplateEnum
 from app.models.slide import Slide
 from app.repositories.carousel_repository import CarouselRepository
 from app.schemas.carousel import CarouselWithDesignResponse
-from app.schemas.design import DesignOut, DesignUpdate
+from app.schemas.design import DesignOut, DesignResponse, DesignUpdate
 from app.services.response_utils import carousel_to_response
 
 
@@ -22,6 +22,15 @@ class DesignService:
         self._session = session
         self._carousel_repo = CarouselRepository(session)
         self._preview_base_url = get_settings().PREVIEW_BASE_URL
+
+    async def get_design(self, carousel_id: UUID) -> DesignResponse | None:
+        """Return design snapshot for carousel (get-or-create). Returns None if carousel not found."""
+        carousel = await self._carousel_repo.get_by_id(carousel_id)
+        if carousel is None:
+            return None
+        design = await self._get_or_create_design(carousel_id)
+        await self._session.refresh(design)
+        return DesignResponse(design=DesignOut.model_validate(design))
 
     async def update_design(
         self,
@@ -62,7 +71,7 @@ class DesignService:
             carousel_id=carousel_id,
             template=TemplateEnum.classic,
             background_type=BackgroundTypeEnum.color,
-            background_value="",
+            background_value="#FFFFFF",
             overlay=0.0,
             padding=24,
             alignment_h="center",

@@ -55,11 +55,17 @@ class DesignOut(BaseModel):
     background_value: str
     overlay: float
     padding: int
-    alignment_h: str
-    alignment_v: str
+    alignment_h: Literal["left", "center", "right"]
+    alignment_v: Literal["top", "center", "bottom"]
     header_enabled: bool
     header_text: str
     footer_enabled: bool
     footer_text: str
 
     model_config = {"from_attributes": True}
+
+
+class DesignResponse(BaseModel):
+    """Response for GET /carousels/{id}/design."""
+
+    design: DesignOut

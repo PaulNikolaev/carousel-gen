@@ -335,6 +335,41 @@ async def test_patch_carousel_video_url_not_found_404(client: AsyncClient) -> No
     assert "detail" in response.json()
 
 
+# --- GET /carousels/{id}/design (step 7.3) ---
+
+
+@pytest.mark.asyncio
+async def test_get_carousel_design_200(client: AsyncClient) -> None:
+    """GET /carousels/{id}/design returns 200 and design snapshot (get-or-create)."""
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Get Design", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+
+    response = await client.get(f"/api/v1/carousels/{carousel_id}/design")
+    assert response.status_code == 200
+    data = response.json()
+    assert "design" in data
+    design = data["design"]
+    assert "template" in design
+    assert "background_type" in design
+    assert "padding" in design
+    assert "header_enabled" in design
+    assert "footer_enabled" in design
+
+
+@pytest.mark.asyncio
+async def test_get_carousel_design_not_found_404(client: AsyncClient) -> None:
+    """GET /carousels/{id}/design returns 404 for non-existent carousel."""
+    response = await client.get(
+        "/api/v1/carousels/00000000-0000-0000-0000-000000000001/design"
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
 # --- PATCH /carousels/{id}/design (step 4.3) ---
 
 
