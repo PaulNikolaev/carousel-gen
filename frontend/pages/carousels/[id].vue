@@ -733,7 +733,12 @@ function startGenerationSSE() {
   const baseUrl = (
     (config.public.apiBaseUrl as string) || "http://localhost:8000"
   ).replace(/\/$/, "");
-  const streamUrl = `${baseUrl}/api/v1/generations/${genId}/stream`;
+  const apiKey = (config.public.apiKey as string) || "";
+  let streamUrl = `${baseUrl}/api/v1/generations/${genId}/stream`;
+  // EventSource does not support custom headers; send api_key as query param instead.
+  if (apiKey) {
+    streamUrl += `${streamUrl.includes("?") ? "&" : "?"}api_key=${encodeURIComponent(apiKey)}`;
+  }
   const es = new EventSource(streamUrl);
   generationEventSource = es;
 
@@ -785,7 +790,12 @@ function startExportSSE() {
   const baseUrl = (
     (config.public.apiBaseUrl as string) || "http://localhost:8000"
   ).replace(/\/$/, "");
-  const streamUrl = `${baseUrl}/api/v1/exports/${expId}/stream`;
+  const apiKey = (config.public.apiKey as string) || "";
+  let streamUrl = `${baseUrl}/api/v1/exports/${expId}/stream`;
+  // EventSource does not support custom headers; send api_key as query param instead.
+  if (apiKey) {
+    streamUrl += `${streamUrl.includes("?") ? "&" : "?"}api_key=${encodeURIComponent(apiKey)}`;
+  }
   const es = new EventSource(streamUrl);
   exportEventSource = es;
 

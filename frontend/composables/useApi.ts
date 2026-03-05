@@ -7,6 +7,7 @@ export function useApi() {
     (config.public.apiBaseUrl as string) ||
     "http://localhost:8000"
   ).replace(/\/$/, "");
+  const apiKey = (config.public.apiKey as string) || "";
   const toast = useToast();
 
   async function request<T>(
@@ -14,8 +15,12 @@ export function useApi() {
     options?: Parameters<typeof $fetch<unknown>>[1]
   ): Promise<T> {
     const url = path.startsWith("/") ? `${baseUrl}${path}` : `${baseUrl}/${path}`;
+    const headers = {
+      ...(options?.headers as Record<string, string> | undefined),
+      ...(apiKey ? { "X-API-Key": apiKey } : {}),
+    };
     try {
-      return await $fetch<T>(url, options);
+      return await $fetch<T>(url, { ...options, headers });
     } catch (e: unknown) {
       const err = e as FetchError;
       const detail = (err as { data?: { detail?: unknown } }).data?.detail;

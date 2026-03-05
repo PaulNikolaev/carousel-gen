@@ -30,6 +30,8 @@ export default defineNuxtConfig({
     apiBaseUrl: "http://backend:8000",
     public: {
       apiBaseUrl: "http://localhost:8000",
+      /** Optional API key; when set, sent as X-API-Key header and as api_key for SSE. */
+      apiKey: "",
     },
   },
 });

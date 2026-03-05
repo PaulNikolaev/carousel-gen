@@ -7,8 +7,18 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def _ensure_no_api_key_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure API_KEY is empty so non-api_key tests do not get 401. test_api_key overrides per test."""
+    monkeypatch.setenv("API_KEY", "")
+    get_settings.cache_clear()
+    yield
+    get_settings.cache_clear()
 
 
 def _test_database_url() -> str:

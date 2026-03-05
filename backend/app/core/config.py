@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     PREVIEW_BASE_URL: str = "http://localhost:8000"
     CORS_ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
 
+    # Optional API key; when set, all /api/v1/* (except health) require X-API-Key or api_key query
+    API_KEY: SecretStr = SecretStr("")
+
     @model_validator(mode="after")
     def validate_critical_settings(self) -> "Settings":
         if self.S3_BUCKET and (not self.S3_ACCESS_KEY or not self.S3_SECRET_KEY.get_secret_value()):
