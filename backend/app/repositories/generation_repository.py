@@ -45,6 +45,17 @@ class GenerationRepository:
         )
         return result.scalar_one_or_none()
 
+    async def list_by_carousel_id(
+        self, carousel_id: UUID, *, limit: int = 50
+    ) -> list[Generation]:
+        result = await self._session.execute(
+            select(Generation)
+            .where(Generation.carousel_id == carousel_id)
+            .order_by(Generation.created_at.desc())
+            .limit(limit)
+        )
+        return list(result.scalars().all())
+
     async def get_by_id(
         self, generation_id: UUID, *, load_carousel: bool = False
     ) -> Generation | None:

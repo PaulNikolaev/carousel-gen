@@ -70,7 +70,7 @@ async def start_generation(
     except CarouselConflictError:
         raise HTTPException(
             status_code=409,
-            detail="Carousel is not in draft or has an active generation",
+            detail="Carousel is not in draft/ready/failed or has an active generation",
         )
 
 

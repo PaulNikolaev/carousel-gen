@@ -82,6 +82,15 @@
           <div class="flex items-center gap-3">
             <button
               type="button"
+              class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-gray-700 shadow-sm transition-colors hover:bg-gray-50 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              :disabled="!canRegenerate"
+              aria-label="Сгенерировать слайды заново"
+              @click="startGeneration"
+            >
+              Сгенерировать заново
+            </button>
+            <button
+              type="button"
               class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               :disabled="!canExport"
               aria-label="Экспорт карусели в ZIP"
@@ -152,6 +161,100 @@
             Повторить
           </button>
         </div>
+        <!-- История генераций -->
+        <details class="mb-4 rounded-lg border border-gray-200 bg-gray-50/50">
+          <summary class="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-inset rounded-lg">
+            История генераций
+          </summary>
+          <div class="border-t border-gray-200 px-4 py-3">
+            <p v-if="generationsLoading" class="text-gray-500 text-sm">
+              Загрузка…
+            </p>
+            <p v-else-if="!generationsList.length" class="text-gray-500 text-sm">
+              Нет записей.
+            </p>
+            <div v-else class="flex flex-col gap-2">
+              <button
+                v-for="gen in generationsList"
+                :key="gen.id"
+                type="button"
+                class="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-left text-sm transition-colors hover:border-gray-300 hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                @click="openGenerationResult(gen.id)"
+              >
+                <span class="text-gray-700">{{ formatGenerationDate(gen.created_at) }}</span>
+                <span
+                  class="rounded px-2 py-0.5 text-xs font-medium"
+                  :class="generationStatusBadgeClass(gen.status)"
+                >
+                  {{ generationStatusLabel(gen.status) }}
+                </span>
+                <span v-if="gen.tokens_used != null" class="text-gray-500 text-xs">
+                  {{ gen.tokens_used }} токенов
+                </span>
+              </button>
+            </div>
+          </div>
+        </details>
+        <!-- Модальное окно результата генерации -->
+        <Teleport to="body">
+          <div
+            v-if="generationResultModalOpen"
+            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Результат генерации"
+            @click.self="generationResultModalOpen = false"
+          >
+            <div
+              ref="generationResultDialogRef"
+              tabindex="-1"
+              class="max-h-[90vh] w-full max-w-lg overflow-hidden rounded-lg border border-gray-200 bg-white shadow-xl"
+              @click.stop
+              @keydown.esc="generationResultModalOpen = false"
+            >
+              <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
+                <h3 class="text-sm font-semibold text-gray-900">
+                  Результат генерации
+                </h3>
+                <button
+                  type="button"
+                  class="rounded p-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                  aria-label="Закрыть"
+                  @click="generationResultModalOpen = false"
+                >
+                  ✕
+                </button>
+              </div>
+              <div class="max-h-[70vh] overflow-y-auto p-4">
+                <p v-if="generationResultLoading" class="text-gray-500 text-sm">
+                  Загрузка…
+                </p>
+                <p v-else-if="generationResultError" class="text-red-600 text-sm">
+                  Не удалось загрузить результат генерации.
+                </p>
+                <template v-else-if="selectedGenerationResult">
+                  <div
+                    v-if="!selectedGenerationResult.result?.length"
+                    class="text-gray-500 text-sm"
+                  >
+                    Нет слайдов (статус: {{ selectedGenerationResult.status }}).
+                  </div>
+                  <ul v-else class="flex flex-col gap-3">
+                    <li
+                      v-for="(slide, idx) in selectedGenerationResult.result"
+                      :key="idx"
+                      class="rounded border border-gray-200 p-3 text-sm"
+                    >
+                      <div class="font-medium text-gray-900">{{ slide.title || '—' }}</div>
+                      <div class="mt-1 text-gray-600">{{ slide.body || '—' }}</div>
+                      <div v-if="slide.footer" class="mt-1 text-gray-500 text-xs">{{ slide.footer }}</div>
+                    </li>
+                  </ul>
+                </template>
+              </div>
+            </div>
+          </div>
+        </Teleport>
         <p v-if="editorSlidesLoading" role="status" class="text-gray-500">
           Загрузка слайдов…
         </p>
@@ -385,6 +488,8 @@ import type {
 import type { SlideResponse, SlideUpdate } from "~/types/slide";
 import type { CarouselResponse } from "~/types/carousel";
 import type {
+  CarouselGenerationsResponse,
+  GenerationListItem,
   GenerationResponse,
   StartGenerationResponse,
 } from "~/types/generation";
@@ -430,6 +535,14 @@ const settingsButtonRef = ref<HTMLButtonElement | null>(null);
 const sheetCloseButtonRef = ref<HTMLButtonElement | null>(null);
 const sheetDialogRef = ref<HTMLElement | null>(null);
 
+const generationsList = ref<GenerationListItem[]>([]);
+const generationsLoading = ref(false);
+const generationResultModalOpen = ref(false);
+const selectedGenerationResult = ref<GenerationResponse | null>(null);
+const generationResultLoading = ref(false);
+const generationResultError = ref(false);
+const generationResultDialogRef = ref<HTMLElement | null>(null);
+
 function handleSheetKeydown(e: KeyboardEvent) {
   if (!sheetDialogRef.value) return;
   const focusable = Array.from(
@@ -455,6 +568,12 @@ function handleSheetKeydown(e: KeyboardEvent) {
   }
 }
 
+watch(generationResultModalOpen, (open) => {
+  if (open) {
+    nextTick(() => generationResultDialogRef.value?.focus());
+  }
+});
+
 watch(designSheetOpen, (open) => {
   if (open) {
     nextTick(() => {
@@ -471,6 +590,13 @@ const canExport = computed(() => {
   if (carousel.value?.status !== "ready") return false;
   if (exportStatus.value === "pending" || exportStatus.value === "running")
     return false;
+  return true;
+});
+
+const canRegenerate = computed(() => {
+  const status = carousel.value?.status;
+  if (status !== "ready" && status !== "failed") return false;
+  if (starting.value) return false;
   return true;
 });
 
@@ -851,11 +977,71 @@ async function ensureEditorSlides() {
   }
 }
 
+async function fetchGenerations() {
+  if (!id.value) return;
+  generationsLoading.value = true;
+  try {
+    const data = await request<CarouselGenerationsResponse>(
+      `/api/v1/carousels/${id.value}/generations`
+    );
+    generationsList.value = data.items;
+  } catch {
+    generationsList.value = [];
+  } finally {
+    generationsLoading.value = false;
+  }
+}
+
+function formatGenerationDate(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function generationStatusLabel(status: string): string {
+  const labels: Record<string, string> = {
+    queued: "В очереди",
+    running: "Выполняется",
+    done: "Готово",
+    failed: "Ошибка",
+  };
+  return labels[status] ?? status;
+}
+
+function generationStatusBadgeClass(status: string): string {
+  if (status === "done") return "bg-green-100 text-green-800";
+  if (status === "failed") return "bg-red-100 text-red-800";
+  if (status === "running" || status === "queued") return "bg-gray-100 text-gray-700";
+  return "bg-gray-100 text-gray-700";
+}
+
+async function openGenerationResult(genId: string) {
+  generationResultModalOpen.value = true;
+  selectedGenerationResult.value = null;
+  generationResultLoading.value = true;
+  generationResultError.value = false;
+  try {
+    const data = await request<GenerationResponse>(`/api/v1/generations/${genId}`);
+    selectedGenerationResult.value = data;
+  } catch {
+    selectedGenerationResult.value = null;
+    generationResultError.value = true;
+  } finally {
+    generationResultLoading.value = false;
+  }
+}
+
 watch(
   () => viewMode.value,
   async (mode) => {
     if (mode === "editor") {
-      await Promise.all([ensureEditorSlides(), fetchDesign()]);
+      await Promise.all([ensureEditorSlides(), fetchDesign(), fetchGenerations()]);
     }
   },
   { immediate: true }

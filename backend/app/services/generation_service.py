@@ -106,7 +106,12 @@ class GenerationService:
         if carousel is None:
             raise CarouselNotFoundError()
         active = await self._gen_repo.get_active_for_carousel(carousel_id)
-        if active is not None or carousel.status != CarouselStatusEnum.draft:
+        allowed_statuses = (
+            CarouselStatusEnum.draft,
+            CarouselStatusEnum.ready,
+            CarouselStatusEnum.failed,
+        )
+        if active is not None or carousel.status not in allowed_statuses:
             raise CarouselConflictError()
         tokens_estimate = 0
         gen = await self._gen_repo.create(
@@ -123,3 +128,9 @@ class GenerationService:
     async def get_by_id(self, generation_id: UUID) -> Generation | None:
         """Return Generation model or None; caller builds response with result list."""
         return await self._gen_repo.get_by_id(generation_id, load_carousel=False)
+
+    async def list_for_carousel(
+        self, carousel_id: UUID, *, limit: int = 50
+    ) -> list[Generation]:
+        """Return generations for carousel, ordered by created_at DESC."""
+        return await self._gen_repo.list_by_carousel_id(carousel_id, limit=limit)

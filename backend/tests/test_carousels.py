@@ -1,12 +1,15 @@
 """Pytest + httpx tests for /api/v1/carousels: POST, GET list, GET by id, PATCH, video upload, video_url."""
 
 import io
+from uuid import UUID, uuid4
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.carousels import _get_storage
 from app.main import app
+from app.models.slide import Slide
 
 
 class MockStorageService:
@@ -409,10 +412,6 @@ async def test_patch_carousel_design_apply_to_all_resets_overrides(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:
     """PATCH .../design?apply_to_all=true resets design_overrides on all slides to {}."""
-    from uuid import UUID
-
-    from app.models.slide import Slide
-
     client, session = client_and_session
     create_resp = await client.post(
         "/api/v1/carousels",
@@ -458,3 +457,94 @@ async def test_patch_carousel_design_not_found_404(client: AsyncClient) -> None:
     )
     assert response.status_code == 404
     assert "detail" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_list_carousel_generations_empty_200(client: AsyncClient) -> None:
+    """GET /carousels/{id}/generations returns 200 and empty items for new carousel."""
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Gen History", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    response = await client.get(f"/api/v1/carousels/{carousel_id}/generations")
+    assert response.status_code == 200
+    data = response.json()
+    assert "items" in data
+    assert isinstance(data["items"], list)
+    assert data["items"] == []
+
+
+@pytest.mark.asyncio
+async def test_list_carousel_generations_after_start_200(client: AsyncClient) -> None:
+    """GET /carousels/{id}/generations returns items with id, created_at, status, tokens_used after start."""
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Gen History", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    start_resp = await client.post(
+        "/api/v1/generations",
+        json={"carousel_id": carousel_id},
+    )
+    assert start_resp.status_code == 202
+    response = await client.get(f"/api/v1/carousels/{carousel_id}/generations")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) >= 1
+    item = data["items"][0]
+    assert "id" in item
+    assert "created_at" in item
+    assert "status" in item
+    assert item["status"] in ("queued", "running", "done", "failed")
+    assert "tokens_used" in item
+
+
+@pytest.mark.asyncio
+async def test_list_carousel_generations_not_found_404(client: AsyncClient) -> None:
+    """GET /carousels/{id}/generations returns 404 for non-existent carousel."""
+    response = await client.get(
+        f"/api/v1/carousels/{uuid4()}/generations",
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
+@pytest.mark.asyncio
+async def test_list_carousel_generations_order_desc(
+    client_and_session: tuple[AsyncClient, AsyncSession],
+) -> None:
+    """GET /carousels/{id}/generations returns items ordered by created_at DESC."""
+    from uuid import UUID
+
+    from app.repositories.carousel_repository import CarouselRepository
+    from app.repositories.generation_repository import GenerationRepository
+
+    client, session = client_and_session
+    carousel_repo = CarouselRepository(session)
+    gen_repo = GenerationRepository(session)
+
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Order Test", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = UUID(create_resp.json()["id"])
+    carousel = await carousel_repo.get_by_id(carousel_id)
+    assert carousel is not None
+
+    gen1 = await gen_repo.create(carousel_id=carousel_id, tokens_estimate=0)
+    await session.flush()
+    gen2 = await gen_repo.create(carousel_id=carousel_id, tokens_estimate=0)
+    await session.flush()
+
+    response = await client.get(f"/api/v1/carousels/{carousel_id}/generations")
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert len(items) == 2
+    # Order by created_at DESC (when equal, order may be non-deterministic)
+    assert items[0]["created_at"] >= items[1]["created_at"]
+    ids = {item["id"] for item in items}
+    assert ids == {str(gen1.id), str(gen2.id)}

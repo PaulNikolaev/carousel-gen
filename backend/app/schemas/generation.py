@@ -30,6 +30,23 @@ class GenerationSlideItem(BaseModel):
     footer: str
 
 
+class GenerationListItem(BaseModel):
+    """Single item in GET /carousels/{id}/generations list."""
+
+    id: UUID
+    created_at: datetime
+    status: GenerationStatusEnum
+    tokens_used: int | None
+
+    model_config = {"from_attributes": True}
+
+
+class CarouselGenerationsResponse(BaseModel):
+    """GET /carousels/{id}/generations response."""
+
+    items: list[GenerationListItem]
+
+
 class GenerationResponse(BaseModel):
     """GET /generations/{id} response."""
 

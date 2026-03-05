@@ -19,8 +19,10 @@ from app.schemas.carousel import (
     CarouselWithDesignResponse,
 )
 from app.schemas.design import DesignResponse, DesignUpdate
+from app.schemas.generation import CarouselGenerationsResponse, GenerationListItem
 from app.services.carousel_service import CarouselService
 from app.services.design_service import DesignService
+from app.services.generation_service import GenerationService
 from app.services.storage_service import StorageService
 
 router = APIRouter(prefix="/carousels", tags=["carousels"])
@@ -45,6 +47,10 @@ def _get_design_service(session: AsyncSession = Depends(get_db)) -> DesignServic
 
 def _get_storage() -> StorageService:
     return StorageService()
+
+
+def _get_generation_service(session: AsyncSession = Depends(get_db)) -> GenerationService:
+    return GenerationService(session)
 
 
 def _validate_video_file(
@@ -100,6 +106,23 @@ async def get_carousel(
     if carousel is None:
         raise HTTPException(status_code=404, detail="Carousel not found")
     return carousel
+
+
+@router.get(
+    "/{carousel_id:uuid}/generations",
+    response_model=CarouselGenerationsResponse,
+)
+async def list_carousel_generations(
+    carousel_id: UUID,
+    carousel_service: CarouselService = Depends(_get_service),
+    generation_service: GenerationService = Depends(_get_generation_service),
+) -> CarouselGenerationsResponse:
+    carousel = await carousel_service.get_by_id(carousel_id)
+    if carousel is None:
+        raise HTTPException(status_code=404, detail="Carousel not found")
+    generations = await generation_service.list_for_carousel(carousel_id)
+    items = [GenerationListItem.model_validate(g) for g in generations]
+    return CarouselGenerationsResponse(items=items)
 
 
 @router.patch("/{carousel_id:uuid}", response_model=CarouselResponse)

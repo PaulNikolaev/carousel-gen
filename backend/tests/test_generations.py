@@ -7,7 +7,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.enums import GenerationStatusEnum
+from app.models.enums import CarouselStatusEnum, GenerationStatusEnum
 from app.repositories.carousel_repository import CarouselRepository
 from app.repositories.generation_repository import GenerationRepository
 
@@ -36,6 +36,81 @@ async def test_start_generation_202(client: AsyncClient, draft_carousel_id: str)
     assert "tokens_estimate" in data
     assert data["tokens_estimate"] >= 0
     assert data["generation_id"] != draft_carousel_id
+
+
+@pytest.mark.asyncio
+async def test_start_generation_202_carousel_becomes_generating(
+    client: AsyncClient, draft_carousel_id: str
+) -> None:
+    """POST /generations with valid carousel_id: after 202, carousel status becomes 'generating'."""
+    response = await client.post(
+        "/api/v1/generations",
+        json={"carousel_id": draft_carousel_id},
+    )
+    assert response.status_code == 202
+    carousel_resp = await client.get(f"/api/v1/carousels/{draft_carousel_id}")
+    assert carousel_resp.status_code == 200
+    assert carousel_resp.json()["status"] == "generating"
+
+
+@pytest.mark.asyncio
+async def test_start_generation_when_ready_202(
+    client_and_session: tuple[AsyncClient, AsyncSession],
+) -> None:
+    """POST /generations when carousel status is 'ready' returns 202, carousel becomes 'generating'."""
+    client, session = client_and_session
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Ready Carousel", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    cid = UUID(carousel_id)
+    carousel_repo = CarouselRepository(session)
+    carousel = await carousel_repo.get_by_id(cid)
+    assert carousel is not None
+    await carousel_repo.update(carousel, status=CarouselStatusEnum.ready)
+    await session.flush()
+
+    response = await client.post(
+        "/api/v1/generations",
+        json={"carousel_id": carousel_id},
+    )
+    assert response.status_code == 202
+    assert "generation_id" in response.json()
+    carousel_resp = await client.get(f"/api/v1/carousels/{carousel_id}")
+    assert carousel_resp.status_code == 200
+    assert carousel_resp.json()["status"] == "generating"
+
+
+@pytest.mark.asyncio
+async def test_start_generation_when_failed_202(
+    client_and_session: tuple[AsyncClient, AsyncSession],
+) -> None:
+    """POST /generations when carousel status is 'failed' returns 202, carousel becomes 'generating'."""
+    client, session = client_and_session
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Failed Carousel", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    cid = UUID(carousel_id)
+    carousel_repo = CarouselRepository(session)
+    carousel = await carousel_repo.get_by_id(cid)
+    assert carousel is not None
+    await carousel_repo.update(carousel, status=CarouselStatusEnum.failed)
+    await session.flush()
+
+    response = await client.post(
+        "/api/v1/generations",
+        json={"carousel_id": carousel_id},
+    )
+    assert response.status_code == 202
+    assert "generation_id" in response.json()
+    carousel_resp = await client.get(f"/api/v1/carousels/{carousel_id}")
+    assert carousel_resp.status_code == 200
+    assert carousel_resp.json()["status"] == "generating"
 
 
 @pytest.mark.asyncio

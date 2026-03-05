@@ -1,6 +1,19 @@
 /** Status of a generation job. */
 export type GenerationStatus = "queued" | "running" | "done" | "failed";
 
+/** Single item from GET /api/v1/carousels/{id}/generations. */
+export interface GenerationListItem {
+  id: string;
+  created_at: string;
+  status: GenerationStatus;
+  tokens_used: number | null;
+}
+
+/** Response of GET /api/v1/carousels/{id}/generations. */
+export interface CarouselGenerationsResponse {
+  items: GenerationListItem[];
+}
+
 /** Response of POST /api/v1/generations (202). */
 export interface StartGenerationResponse {
   generation_id: string;
