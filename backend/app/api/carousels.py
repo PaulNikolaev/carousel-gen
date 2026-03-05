@@ -4,7 +4,7 @@ import io
 from uuid import UUID
 
 from botocore.exceptions import BotoCoreError, ClientError
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.slides import router as slides_router
@@ -15,8 +15,11 @@ from app.schemas.carousel import (
     CarouselListResponse,
     CarouselResponse,
     CarouselUpdate,
+    CarouselWithDesignResponse,
 )
+from app.schemas.design import DesignUpdate
 from app.services.carousel_service import CarouselService
+from app.services.design_service import DesignService
 from app.services.storage_service import StorageService
 
 router = APIRouter(prefix="/carousels", tags=["carousels"])
@@ -33,6 +36,10 @@ VIDEO_MIME_TYPES: set[str] = {
 
 def _get_service(session: AsyncSession = Depends(get_db)) -> CarouselService:
     return CarouselService(session)
+
+
+def _get_design_service(session: AsyncSession = Depends(get_db)) -> DesignService:
+    return DesignService(session)
 
 
 def _get_storage() -> StorageService:
@@ -93,6 +100,27 @@ async def update_carousel(
     if carousel is None:
         raise HTTPException(status_code=404, detail="Carousel not found")
     return carousel
+
+
+@router.patch(
+    "/{carousel_id:uuid}/design",
+    response_model=CarouselWithDesignResponse,
+)
+async def update_carousel_design(
+    carousel_id: UUID,
+    payload: DesignUpdate,
+    apply_to_all: bool = Query(
+        False,
+        description="Reset design_overrides on all slides",
+    ),
+    service: DesignService = Depends(_get_design_service),
+) -> CarouselWithDesignResponse:
+    result = await service.update_design(
+        carousel_id, payload, apply_to_all=apply_to_all
+    )
+    if result is None:
+        raise HTTPException(status_code=404, detail="Carousel not found")
+    return result
 
 
 @router.post("/{carousel_id:uuid}/video", response_model=CarouselResponse)

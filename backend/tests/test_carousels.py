@@ -3,6 +3,7 @@
 import io
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.carousels import _get_storage
 from app.main import app
@@ -329,6 +330,96 @@ async def test_patch_carousel_video_url_not_found_404(client: AsyncClient) -> No
     response = await client.patch(
         "/api/v1/carousels/00000000-0000-0000-0000-000000000001",
         json={"video_url": "https://example.com/v.mp4"},
+    )
+    assert response.status_code == 404
+    assert "detail" in response.json()
+
+
+# --- PATCH /carousels/{id}/design (step 4.3) ---
+
+
+@pytest.mark.asyncio
+async def test_patch_carousel_design_partial_200(client: AsyncClient) -> None:
+    """PATCH /carousels/{id}/design with partial payload returns 200 and design snapshot."""
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Design Test", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+
+    response = await client.patch(
+        f"/api/v1/carousels/{carousel_id}/design",
+        json={
+            "template": "bold",
+            "header": {"enabled": True, "text": "My Header"},
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "design" in data
+    design = data["design"]
+    assert design["template"] == "bold"
+    assert design["header_enabled"] is True
+    assert design["header_text"] == "My Header"
+    assert "background_type" in design
+    assert "padding" in design
+    assert "footer_enabled" in design
+    assert data["id"] == carousel_id
+    assert data["title"] == "Design Test"
+
+
+@pytest.mark.asyncio
+async def test_patch_carousel_design_apply_to_all_resets_overrides(
+    client_and_session: tuple[AsyncClient, AsyncSession],
+) -> None:
+    """PATCH .../design?apply_to_all=true resets design_overrides on all slides to {}."""
+    from uuid import UUID
+
+    from app.models.slide import Slide
+
+    client, session = client_and_session
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Apply To All", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+    cid = UUID(carousel_id) if isinstance(carousel_id, str) else carousel_id
+
+    slide = Slide(
+        carousel_id=cid,
+        order=0,
+        title="S1",
+        body="",
+        footer="",
+        design_overrides={"padding": 10},
+    )
+    session.add(slide)
+    await session.flush()
+    await session.refresh(slide)
+
+    response = await client.patch(
+        f"/api/v1/carousels/{carousel_id}/design",
+        params={"apply_to_all": True},
+        json={"template": "minimal"},
+    )
+    assert response.status_code == 200
+    assert response.json()["design"]["template"] == "minimal"
+
+    slides_resp = await client.get(f"/api/v1/carousels/{carousel_id}/slides")
+    assert slides_resp.status_code == 200
+    slides = slides_resp.json()
+    assert len(slides) == 1
+    assert slides[0]["design_overrides"] == {}
+
+
+@pytest.mark.asyncio
+async def test_patch_carousel_design_not_found_404(client: AsyncClient) -> None:
+    """PATCH /carousels/{id}/design returns 404 for non-existent carousel_id."""
+    response = await client.patch(
+        "/api/v1/carousels/00000000-0000-0000-0000-000000000001/design",
+        json={"template": "bold"},
     )
     assert response.status_code == 404
     assert "detail" in response.json()

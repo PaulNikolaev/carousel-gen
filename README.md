@@ -1,6 +1,10 @@
 # Carousel Gen
 
-## Запуск проекта
+## Приложение (основной стек)
+
+Стек: backend, frontend, postgres, minio. Файл по умолчанию: `docker-compose.yml`.
+
+### Подготовка
 
 1. Скопируйте `backend/.env.example` в `backend/.env`, при необходимости заполните переменные.
 
@@ -14,13 +18,47 @@
    Copy-Item backend\.env.example backend\.env
    ```
 
-2. Запуск:
+Миграции БД применяются при старте backend.
 
-   ```bash
-   docker compose up --build
-   ```
+### Запуск приложения
 
-3. Миграции БД применяются при старте backend.
+- **В фоне** (сервисы работают, логи в консоль не выводятся):
+
+  ```bash
+  docker compose up -d
+  ```
+
+  Первый раз или после изменения образов — с пересборкой:
+
+  ```bash
+  docker compose up --build -d
+  ```
+
+- **С выводом в консоль** (логи всех сервисов в текущем терминале, остановка по Ctrl+C):
+
+  ```bash
+  docker compose up
+  ```
+
+  С пересборкой:
+
+  ```bash
+  docker compose up --build
+  ```
+
+### Остановка приложения
+
+- **Остановить контейнеры** (данные в тома сохраняются):
+
+  ```bash
+  docker compose down
+  ```
+
+- **Остановить и удалить тома** (полная очистка данных БД, MinIO и т.д.):
+
+  ```bash
+  docker compose down -v
+  ```
 
 | Сервис   | Адрес |
 |----------|-------|
@@ -31,9 +69,13 @@
 | MinIO API | http://localhost:9000 |
 | MinIO консоль | http://localhost:9001 |
 
+---
+
 ## Тестирование
 
-Тесты используют БД `carousel_test` и `docker-compose.test.yml`. Порядок запуска: **postgres** → **migrate** (миграции) → **backend** (pytest). Переменные окружения берутся из `backend/.env.test` (значения из compose переопределяют при необходимости).
+Тесты используют БД `carousel_test` и файл `docker-compose.test.yml`. Порядок запуска: **postgres** → **migrate** (миграции) → **backend** (pytest). Переменные окружения — из `backend/.env.test` (значения из compose имеют приоритет).
+
+### Подготовка к тестам
 
 Перед первым запуском создайте тестовый конфиг:
 
@@ -47,48 +89,27 @@ PowerShell:
 Copy-Item backend\.env.test.example backend\.env.test
 ```
 
-В `.env.test` уже указан `DATABASE_URL` для Docker (`postgres:5432`); для локального pytest без compose см. раздел «Локальный запуск pytest».
+В `.env.test` уже указан `DATABASE_URL` для Docker (`postgres:5432`).
 
-### Одна команда (в фоне)
+### Запуск тестов
 
-```bash
-docker compose -f docker-compose.test.yml up -d
-```
+- **В фоне** (postgres, migrate, backend поднимаются; backend один раз запускает pytest и завершается). Результаты — в логах:
 
-Поднимаются postgres, migrate и backend; backend один раз запускает pytest и завершается. Результаты тестов смотрите в логах:
+  ```bash
+  docker compose -f docker-compose.test.yml up -d
+  docker compose -f docker-compose.test.yml logs backend
+  ```
 
-```bash
-docker compose -f docker-compose.test.yml logs backend
-```
+### Остановка тестового стека
 
-### Одна команда (вывод в консоль, код выхода = код pytest)
+- **Остановить контейнеры** (тестовая БД в томе сохраняется):
 
-```bash
-docker compose -f docker-compose.test.yml up --abort-on-container-exit
-```
+  ```bash
+  docker compose -f docker-compose.test.yml down
+  ```
 
-Вывод тестов идёт в консоль; после завершения pytest compose останавливается с тем же кодом выхода (0 = успех).
+- **Остановить и удалить тома** (очистить тестовую БД и тома):
 
-### Остановка
-
-```bash
-docker compose -f docker-compose.test.yml down
-```
-
-## Локальный запуск pytest
-
-1. `cd backend`
-2. Скопируйте `backend/.env.test.example` в `backend/.env.test`, в нём укажите `DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5433/carousel_test`.
-3. Установите зависимости и поднимите тестовый Postgres:
-
-   ```bash
-   pip install -r requirements.txt -r requirements-dev.txt
-   docker compose -f docker-compose.test.yml up -d postgres
-   ```
-
-4. Миграции и тесты:
-
-   ```bash
-   alembic upgrade head
-   python -m pytest tests -v
-   ```
+  ```bash
+  docker compose -f docker-compose.test.yml down -v
+  ```

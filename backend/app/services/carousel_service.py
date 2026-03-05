@@ -14,29 +14,13 @@ from app.schemas.carousel import (
     CarouselUpdate,
     FormatSchema,
 )
+from app.services.response_utils import carousel_to_response
 
 
 def _format_to_dict(value: FormatSchema | None) -> dict:
     if value is None:
         return {}
     return value.model_dump(exclude_none=True)
-
-
-def _carousel_to_response(carousel, preview_base_url: str) -> CarouselResponse:
-    preview_url = f"{preview_base_url.rstrip('/')}/api/v1/carousels/{carousel.id}/preview"
-    return CarouselResponse(
-        id=carousel.id,
-        title=carousel.title,
-        source_type=carousel.source_type,
-        source_payload=carousel.source_payload,
-        format=carousel.format,
-        status=carousel.status,
-        language=carousel.language,
-        slides_count=carousel.slides_count,
-        created_at=carousel.created_at,
-        updated_at=carousel.updated_at,
-        preview_url=preview_url,
-    )
 
 
 class CarouselService:
@@ -56,13 +40,13 @@ class CarouselService:
             language=payload.language,
             slides_count=payload.slides_count,
         )
-        return _carousel_to_response(carousel, self._preview_base_url)
+        return carousel_to_response(carousel, self._preview_base_url)
 
     async def get_by_id(self, carousel_id: UUID) -> CarouselResponse | None:
         carousel = await self._repo.get_by_id(carousel_id)
         if carousel is None:
             return None
-        return _carousel_to_response(carousel, self._preview_base_url)
+        return carousel_to_response(carousel, self._preview_base_url)
 
     async def list(
         self,
@@ -75,7 +59,7 @@ class CarouselService:
         carousels, total = await self._repo.list(
             status=status, lang=lang, skip=skip, limit=limit
         )
-        items = [_carousel_to_response(c, self._preview_base_url) for c in carousels]
+        items = [carousel_to_response(c, self._preview_base_url) for c in carousels]
         return CarouselListResponse(items=items, total=total)
 
     async def update(

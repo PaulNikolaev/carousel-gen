@@ -8,6 +8,8 @@ from pydantic import BaseModel, Field, field_validator
 
 from app.models.enums import CarouselStatusEnum, SourceTypeEnum
 
+from app.schemas.design import DesignOut
+
 
 class FormatSchema(BaseModel):
     """Format JSONB: slides_count, language, style_hint."""
@@ -62,6 +64,12 @@ class CarouselResponse(BaseModel):
     preview_url: str
 
     model_config = {"from_attributes": True}
+
+
+class CarouselWithDesignResponse(CarouselResponse):
+    """Carousel response with design snapshot (for PATCH .../design)."""
+
+    design: DesignOut
 
 
 class CarouselListResponse(BaseModel):
