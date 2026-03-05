@@ -42,6 +42,7 @@ services:
       - backend/.env.test
     environment:
       DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/${POSTGRES_DB:-carousel_test}
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/${POSTGRES_DB:-carousel_test}
       PYTEST_CACHE_DIR: /tmp/.pytest_cache
     depends_on:
       migrate:

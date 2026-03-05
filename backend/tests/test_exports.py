@@ -1,5 +1,6 @@
-"""Pytest + httpx tests for /api/v1/exports: POST start export, GET export by id."""
+"""Pytest + httpx tests for /api/v1/exports: POST start export, GET export by id, GET stream SSE."""
 
+import json
 from uuid import UUID
 
 import pytest
@@ -163,3 +164,65 @@ async def test_post_export_missing_carousel_id_422(client: AsyncClient) -> None:
     """POST /exports without carousel_id returns 422."""
     response = await client.post("/api/v1/exports", json={})
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_get_export_stream_404(client: AsyncClient) -> None:
+    """GET /exports/{id}/stream returns 404 for non-existent export."""
+    response = await client.get(
+        "/api/v1/exports/00000000-0000-0000-0000-000000000002/stream"
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_export_stream_200_sends_events(
+    client_and_session: tuple[AsyncClient, AsyncSession],
+) -> None:
+    """GET /exports/{id}/stream returns 200 and sends at least one SSE event until done/failed."""
+    client, session = client_and_session
+    app.dependency_overrides[_get_storage] = lambda: MockStorageService()
+    try:
+        create_resp = await client.post(
+            "/api/v1/carousels",
+            json={"title": "Stream Export Carousel", "source_type": "text"},
+        )
+        assert create_resp.status_code == 201
+        carousel_id = create_resp.json()["id"]
+
+        export_repo = ExportRepository(session)
+        export = await export_repo.create(
+            carousel_id=UUID(carousel_id) if isinstance(carousel_id, str) else carousel_id
+        )
+        await export_repo.update(
+            export,
+            status=ExportStatusEnum.done,
+            s3_key="exports/fake/archive.zip",
+        )
+        await session.flush()
+        export_id = str(export.id)
+
+        async with client.stream(
+            "GET", f"/api/v1/exports/{export_id}/stream"
+        ) as response:
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers.get("content-type", "")
+            lines = []
+            async for line in response.aiter_lines():
+                lines.append(line)
+                if line.startswith("data: "):
+                    payload = json.loads(line[6:])
+                    if payload.get("status") in ("done", "failed"):
+                        break
+
+        data_lines = [ln for ln in lines if ln.startswith("data: ")]
+        assert len(data_lines) >= 1
+        first = json.loads(data_lines[0][6:])
+        assert first["id"] == export_id
+        assert first["carousel_id"] == carousel_id
+        assert first["status"] in ("pending", "running", "done", "failed")
+        assert "created_at" in first
+        if first["status"] == "done":
+            assert "download_url" in first
+    finally:
+        app.dependency_overrides.pop(_get_storage, None)

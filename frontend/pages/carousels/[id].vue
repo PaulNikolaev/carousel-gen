@@ -416,10 +416,9 @@ let designDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const pendingDesignPatch = ref<DesignUpdate>({});
 
 const POLL_INTERVAL_MS = 3000;
-let pollTimer: ReturnType<typeof setInterval> | null = null;
 
-const EXPORT_POLL_INTERVAL_MS = 5000;
-let exportPollTimer: ReturnType<typeof setInterval> | null = null;
+let generationEventSource: EventSource | null = null;
+let exportEventSource: EventSource | null = null;
 
 const exportId = ref<string | null>(null);
 const exportStatus = ref<ExportResponse["status"] | null>(null);
@@ -699,6 +698,7 @@ async function fetchCarousel() {
 
 async function startGeneration() {
   if (starting.value) return;
+  closeGenerationSSE();
   starting.value = true;
   tokensEstimate.value = null;
   generation.value = null;
@@ -710,7 +710,7 @@ async function startGeneration() {
     activeGenerationId.value = data.generation_id;
     tokensEstimate.value = data.tokens_estimate;
     await fetchCarousel();
-    startPollingGeneration();
+    startGenerationSSE();
   } catch {
     // useApi shows toast
   } finally {
@@ -718,37 +718,54 @@ async function startGeneration() {
   }
 }
 
-async function pollGeneration() {
-  if (!activeGenerationId.value) return;
-  try {
-    const gen = await request<GenerationResponse>(
-      `/api/v1/generations/${activeGenerationId.value}`
-    );
-    generation.value = gen;
-    if (gen.status === "done") {
-      stopPolling();
-      await fetchCarousel();
-      await ensureEditorSlides();
-    } else if (gen.status === "failed") {
-      stopPolling();
-      await fetchCarousel();
-    }
-    if (gen.tokens_estimate != null) tokensEstimate.value = gen.tokens_estimate;
-  } catch {
-    // keep polling on transient errors
+function closeGenerationSSE() {
+  if (generationEventSource) {
+    generationEventSource.close();
+    generationEventSource = null;
   }
 }
 
-function startPollingGeneration() {
-  stopPolling();
-  pollTimer = setInterval(pollGeneration, POLL_INTERVAL_MS);
-  pollGeneration();
+function startGenerationSSE() {
+  const genId = activeGenerationId.value;
+  if (!genId) return;
+  closeGenerationSSE();
+  const config = useRuntimeConfig();
+  const baseUrl = (
+    (config.public.apiBaseUrl as string) || "http://localhost:8000"
+  ).replace(/\/$/, "");
+  const streamUrl = `${baseUrl}/api/v1/generations/${genId}/stream`;
+  const es = new EventSource(streamUrl);
+  generationEventSource = es;
+
+  es.onmessage = async (e: MessageEvent) => {
+    try {
+      const data = JSON.parse(e.data) as GenerationResponse;
+      generation.value = data;
+      if (data.tokens_estimate != null) tokensEstimate.value = data.tokens_estimate;
+      if (data.status === "done") {
+        closeGenerationSSE();
+        await fetchCarousel();
+        await ensureEditorSlides();
+      } else if (data.status === "failed") {
+        closeGenerationSSE();
+        await fetchCarousel();
+      }
+    } catch {
+      closeGenerationSSE();
+    }
+  };
+
+  es.onerror = () => {
+    closeGenerationSSE();
+    startCarouselPolling();
+    void fetchCarousel();
+  };
 }
 
-function stopPolling() {
-  if (pollTimer) {
-    clearInterval(pollTimer);
-    pollTimer = null;
+function closeExportSSE() {
+  if (exportEventSource) {
+    exportEventSource.close();
+    exportEventSource = null;
   }
 }
 
@@ -757,39 +774,39 @@ function clearExportState() {
   exportStatus.value = null;
   exportDownloadUrl.value = null;
   exportError.value = null;
-  stopExportPolling();
+  closeExportSSE();
 }
 
-function stopExportPolling() {
-  if (exportPollTimer) {
-    clearInterval(exportPollTimer);
-    exportPollTimer = null;
-  }
-}
+function startExportSSE() {
+  const expId = exportId.value;
+  if (!expId) return;
+  closeExportSSE();
+  const config = useRuntimeConfig();
+  const baseUrl = (
+    (config.public.apiBaseUrl as string) || "http://localhost:8000"
+  ).replace(/\/$/, "");
+  const streamUrl = `${baseUrl}/api/v1/exports/${expId}/stream`;
+  const es = new EventSource(streamUrl);
+  exportEventSource = es;
 
-async function pollExport() {
-  if (!exportId.value) return;
-  try {
-    const data = await request<ExportResponse>(
-      `/api/v1/exports/${exportId.value}`
-    );
-    exportStatus.value = data.status;
-    if (data.status === "done") {
+  es.onmessage = (e: MessageEvent) => {
+    try {
+      const data = JSON.parse(e.data) as ExportResponse;
+      exportStatus.value = data.status;
       exportDownloadUrl.value = data.download_url ?? null;
-      stopExportPolling();
-    } else if (data.status === "failed") {
       exportError.value = data.error_message ?? null;
-      stopExportPolling();
+      if (data.status === "done" || data.status === "failed") {
+        closeExportSSE();
+      }
+    } catch {
+      closeExportSSE();
     }
-  } catch {
-    // keep polling on transient errors
-  }
-}
+  };
 
-function startExportPolling() {
-  stopExportPolling();
-  exportPollTimer = setInterval(pollExport, EXPORT_POLL_INTERVAL_MS);
-  pollExport();
+  es.onerror = () => {
+    exportStatus.value = "failed";
+    closeExportSSE();
+  };
 }
 
 async function startExport() {
@@ -802,7 +819,7 @@ async function startExport() {
       body: { carousel_id: id.value },
     });
     exportId.value = data.export_id;
-    startExportPolling();
+    startExportSSE();
   } catch {
     exportStatus.value = null;
     // useApi shows toast
@@ -837,8 +854,7 @@ watch(
 watch(
   () => carousel.value?.status,
   (status) => {
-    if (status === "generating" && !activeGenerationId.value) {
-      // Refreshed during generation: poll carousel until ready/failed
+    if (status === "generating" && !generationEventSource) {
       startCarouselPolling();
     } else {
       stopCarouselPolling();
@@ -875,7 +891,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   sheetDialogRef.value?.removeEventListener('keydown', handleSheetKeydown);
-  stopPolling();
+  closeGenerationSSE();
   stopCarouselPolling();
   clearExportState();
   Object.values(debounceTimers).forEach(clearTimeout);

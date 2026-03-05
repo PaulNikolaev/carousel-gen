@@ -1,9 +1,15 @@
-"""Pytest + httpx tests for /api/v1/generations: POST start, GET by id."""
+"""Pytest + httpx tests for /api/v1/generations: POST start, GET by id, GET stream SSE."""
 
-from uuid import uuid4
+import json
+from uuid import UUID, uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.enums import GenerationStatusEnum
+from app.repositories.carousel_repository import CarouselRepository
+from app.repositories.generation_repository import GenerationRepository
 
 
 @pytest.fixture
@@ -130,3 +136,57 @@ async def test_get_generation_invalid_uuid_404(client: AsyncClient) -> None:
     """GET /generations/{id} with non-UUID path does not match route; FastAPI returns 404."""
     response = await client.get("/api/v1/generations/not-a-uuid")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_generation_stream_404(client: AsyncClient) -> None:
+    """GET /generations/{id}/stream returns 404 for non-existent generation."""
+    response = await client.get(
+        "/api/v1/generations/00000000-0000-0000-0000-000000000001/stream"
+    )
+    assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_generation_stream_200_sends_events(
+    client_and_session: tuple[AsyncClient, AsyncSession],
+) -> None:
+    """GET /generations/{id}/stream returns 200 and sends at least one SSE event until done/failed."""
+    client, session = client_and_session
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Stream Gen", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+
+    gen_repo = GenerationRepository(session)
+    carousel_repo = CarouselRepository(session)
+    carousel = await carousel_repo.get_by_id(UUID(carousel_id))
+    assert carousel is not None
+    gen = await gen_repo.create(carousel_id=carousel.id, tokens_estimate=100)
+    await gen_repo.update(gen, status=GenerationStatusEnum.done, tokens_used=50)
+    await session.flush()
+    generation_id = str(gen.id)
+
+    async with client.stream(
+        "GET", f"/api/v1/generations/{generation_id}/stream"
+    ) as response:
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers.get("content-type", "")
+        lines = []
+        async for line in response.aiter_lines():
+            lines.append(line)
+            if line.startswith("data: "):
+                payload = json.loads(line[6:])
+                if payload.get("status") in ("done", "failed"):
+                    break
+
+    data_lines = [ln for ln in lines if ln.startswith("data: ")]
+    assert len(data_lines) >= 1
+    first = json.loads(data_lines[0][6:])
+    assert first["id"] == generation_id
+    assert first["carousel_id"] == carousel_id
+    assert first["status"] in ("queued", "running", "done", "failed")
+    assert "tokens_estimate" in first
+    assert "created_at" in first
