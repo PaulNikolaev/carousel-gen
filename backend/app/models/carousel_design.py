@@ -39,6 +39,10 @@ class CarouselDesign(Base):
     header_text: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     footer_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     footer_text: Mapped[str] = mapped_column(String(512), nullable=False, default="")
+    font_size: Mapped[int] = mapped_column(Integer, nullable=False, default=16)
+    font_family: Mapped[str] = mapped_column(String(128), nullable=False, default="system-ui")
+    font_weight: Mapped[str] = mapped_column(String(16), nullable=False, default="normal")
+    font_style: Mapped[str] = mapped_column(String(16), nullable=False, default="normal")
 
     carousel: Mapped[Carousel] = relationship(
         "Carousel",

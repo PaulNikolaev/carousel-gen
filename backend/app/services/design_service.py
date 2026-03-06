@@ -30,6 +30,10 @@ _DESIGN_OVERRIDE_KEYS = (
     "header_text",
     "footer_enabled",
     "footer_text",
+    "font_size",
+    "font_family",
+    "font_weight",
+    "font_style",
 )
 
 
@@ -49,6 +53,10 @@ def _design_out_from_carousel_and_overrides(
         "header_text": design.header_text or "",
         "footer_enabled": design.footer_enabled,
         "footer_text": design.footer_text or "",
+        "font_size": design.font_size,
+        "font_family": design.font_family or "system-ui",
+        "font_weight": design.font_weight or "normal",
+        "font_style": design.font_style or "normal",
     }
     for key in _DESIGN_OVERRIDE_KEYS:
         if key in overrides and overrides[key] is not None:
@@ -90,6 +98,15 @@ def _design_update_to_flat_overrides(payload: DesignUpdate) -> dict:
             out["footer_enabled"] = payload.footer.enabled
         if payload.footer.text is not None:
             out["footer_text"] = payload.footer.text
+    if payload.typography is not None:
+        if payload.typography.font_size is not None:
+            out["font_size"] = payload.typography.font_size
+        if payload.typography.font_family is not None:
+            out["font_family"] = payload.typography.font_family
+        if payload.typography.font_weight is not None:
+            out["font_weight"] = payload.typography.font_weight
+        if payload.typography.font_style is not None:
+            out["font_style"] = payload.typography.font_style
     return out
 
 
@@ -215,6 +232,10 @@ class DesignService:
             header_text="",
             footer_enabled=True,
             footer_text="",
+            font_size=16,
+            font_family="system-ui",
+            font_weight="normal",
+            font_style="normal",
         )
         self._session.add(design)
         try:
@@ -255,3 +276,12 @@ class DesignService:
                 design.footer_enabled = payload.footer.enabled
             if payload.footer.text is not None:
                 design.footer_text = payload.footer.text
+        if payload.typography is not None:
+            if payload.typography.font_size is not None:
+                design.font_size = payload.typography.font_size
+            if payload.typography.font_family is not None:
+                design.font_family = payload.typography.font_family
+            if payload.typography.font_weight is not None:
+                design.font_weight = payload.typography.font_weight
+            if payload.typography.font_style is not None:
+                design.font_style = payload.typography.font_style

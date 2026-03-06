@@ -176,6 +176,68 @@
       </div>
     </div>
 
+    <!-- Шрифт -->
+    <div
+      v-show="activeTab === 'typography'"
+      role="tabpanel"
+      class="flex flex-col gap-3"
+    >
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-gray-600">
+          Размер шрифта: {{ fontSize }} px
+        </label>
+        <input
+          :value="fontSize"
+          type="range"
+          min="12"
+          max="32"
+          class="h-2 w-full cursor-pointer appearance-none rounded-full bg-gray-200 accent-primary"
+          @input="onFontSizeInput"
+        />
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-gray-600">Шрифт</label>
+        <select
+          :value="fontFamily"
+          class="w-full rounded border border-gray-300 px-2 py-1.5 text-sm"
+          @change="onFontFamilyChange"
+        >
+          <option
+            v-for="opt in fontFamilyOptions"
+            :key="opt.value"
+            :value="opt.value"
+          >
+            {{ opt.label }}
+          </option>
+        </select>
+      </div>
+      <div class="flex flex-col gap-1">
+        <label class="text-xs font-medium text-gray-600">Начертание</label>
+        <div class="flex gap-1">
+          <button
+            type="button"
+            :aria-pressed="fontWeight === 'bold'"
+            class="flex h-8 w-8 items-center justify-center rounded border text-sm font-bold transition-colors"
+            :class="fontWeight === 'bold' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 hover:border-gray-300'"
+            title="Жирный"
+            @click="onBoldClick"
+          >
+            B
+          </button>
+          <button
+            type="button"
+            :aria-pressed="fontStyle === 'italic'"
+            class="flex h-8 w-8 items-center justify-center rounded border text-sm italic transition-colors"
+            :class="fontStyle === 'italic' ? 'border-primary bg-primary/10 text-primary' : 'border-gray-200 hover:border-gray-300'"
+            title="Курсив"
+            @click="onItalicClick"
+          >
+            I
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Шапка & Подвал -->
     <div
       v-show="activeTab === 'headerfooter'"
@@ -253,6 +315,7 @@ const tabs = [
   { id: "background", label: "Фон" },
   { id: "layout", label: "Макет" },
   { id: "headerfooter", label: "Шапка & Подвал" },
+  { id: "typography", label: "Шрифт" },
 ] as const;
 
 type TabId = (typeof tabs)[number]["id"];
@@ -276,6 +339,24 @@ const alignmentVLabels: Record<(typeof alignmentV)[number], string> = {
   center: "Центр",
   bottom: "Низ",
 };
+
+const fontFamilyOptions = [
+  { value: "system-ui", label: "System UI" },
+  { value: "Arial", label: "Arial" },
+  { value: "Helvetica", label: "Helvetica" },
+  { value: "Georgia", label: "Georgia" },
+  { value: "Times New Roman", label: "Times New Roman" },
+  { value: "Verdana", label: "Verdana" },
+  { value: "sans-serif", label: "Sans Serif" },
+  { value: "serif", label: "Serif" },
+];
+
+const fontSize = computed(() =>
+  Math.min(32, Math.max(12, props.design.font_size ?? 16))
+);
+const fontFamily = computed(() => props.design.font_family ?? "system-ui");
+const fontWeight = computed(() => props.design.font_weight ?? "normal");
+const fontStyle = computed(() => props.design.font_style ?? "normal");
 
 const overlayPercent = computed(() => Math.round(props.design.overlay * 100));
 
@@ -363,6 +444,26 @@ function onFooterEnabledChange(e: Event) {
 function onFooterTextInput(e: Event) {
   const v = (e.target as HTMLInputElement).value;
   emit("update", { footer: { text: v } });
+}
+
+function onFontSizeInput(e: Event) {
+  const v = Number((e.target as HTMLInputElement).value);
+  emit("update", { typography: { font_size: v } });
+}
+
+function onFontFamilyChange(e: Event) {
+  const v = (e.target as HTMLSelectElement).value;
+  emit("update", { typography: { font_family: v } });
+}
+
+function onBoldClick() {
+  const next = fontWeight.value === "bold" ? "normal" : "bold";
+  emit("update", { typography: { font_weight: next } });
+}
+
+function onItalicClick() {
+  const next = fontStyle.value === "italic" ? "normal" : "italic";
+  emit("update", { typography: { font_style: next } });
 }
 
 function emitApplyToAll() {

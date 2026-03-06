@@ -770,6 +770,15 @@ function mergeDesignUpdate(prev: DesignUpdate, next: DesignUpdate): DesignUpdate
             text: next.footer?.text ?? prev.footer?.text,
           }
         : undefined,
+    typography:
+      next.typography || prev.typography
+        ? {
+            font_size: next.typography?.font_size ?? prev.typography?.font_size,
+            font_family: next.typography?.font_family ?? prev.typography?.font_family,
+            font_weight: next.typography?.font_weight ?? prev.typography?.font_weight,
+            font_style: next.typography?.font_style ?? prev.typography?.font_style,
+          }
+        : undefined,
   };
 }
 
@@ -786,6 +795,10 @@ function applyDesignUpdate(snapshot: DesignSnapshot, update: DesignUpdate): Desi
     header_text: update.header?.text ?? snapshot.header_text,
     footer_enabled: update.footer?.enabled ?? snapshot.footer_enabled,
     footer_text: update.footer?.text ?? snapshot.footer_text,
+    font_size: update.typography?.font_size ?? snapshot.font_size ?? 16,
+    font_family: update.typography?.font_family ?? snapshot.font_family ?? "system-ui",
+    font_weight: update.typography?.font_weight ?? snapshot.font_weight ?? "normal",
+    font_style: update.typography?.font_style ?? snapshot.font_style ?? "normal",
   };
 }
 
@@ -796,6 +809,12 @@ function designSnapshotToUpdate(s: DesignSnapshot): DesignUpdate {
     layout: { padding: s.padding, alignment_h: s.alignment_h, alignment_v: s.alignment_v },
     header: { enabled: s.header_enabled, text: s.header_text },
     footer: { enabled: s.footer_enabled, text: s.footer_text },
+    typography: {
+      font_size: s.font_size ?? 16,
+      font_family: s.font_family ?? "system-ui",
+      font_weight: s.font_weight ?? "normal",
+      font_style: s.font_style ?? "normal",
+    },
   };
 }
 
@@ -1162,8 +1181,16 @@ watch(currentSlideIndex, () => {
   if (designDebounceTimer) {
     clearTimeout(designDebounceTimer);
     designDebounceTimer = null;
+    if (Object.keys(pendingDesignPatch.value).length > 0) {
+      const payload = { ...pendingDesignPatch.value };
+      pendingDesignPatch.value = {};
+      patchDesign(payload, false);
+    } else {
+      pendingDesignPatch.value = {};
+    }
+  } else {
+    pendingDesignPatch.value = {};
   }
-  pendingDesignPatch.value = {};
   fetchDesign();
 });
 

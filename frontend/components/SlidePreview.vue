@@ -13,6 +13,7 @@
     <header
       v-if="design.header_enabled"
       class="slide-preview__header flex shrink-0 items-center justify-between py-2 text-[10px] opacity-90"
+      :style="typographyStyle"
     >
       <span class="slide-preview__header-text">{{ design.header_text || " " }}</span>
       <span class="slide-preview__counter">{{ slideIndex }} / {{ totalSlides }}</span>
@@ -24,12 +25,14 @@
       <h2
         v-if="slide.title"
         class="slide-preview__title text-xl font-medium leading-tight"
+        :style="typographyStyle"
       >
         {{ slide.title }}
       </h2>
       <p
         v-if="slide.body"
         class="slide-preview__body text-[11px] leading-relaxed"
+        :style="typographyStyle"
       >
         {{ slide.body }}
       </p>
@@ -37,6 +40,7 @@
     <footer
       v-if="design.footer_enabled"
       class="slide-preview__footer flex shrink-0 items-center justify-between py-2 text-[10px] opacity-90"
+      :style="typographyStyle"
     >
       <span class="slide-preview__footer-text">{{ design.footer_text || slide.footer || " " }}</span>
     </footer>
@@ -67,13 +71,25 @@ const props = withDefaults(
 
 const templateClass = computed(() => `slide-preview--${props.design.template}`);
 
+const typographyStyle = computed(() => {
+  const d = props.design;
+  const size = Math.min(32, Math.max(12, d.font_size ?? 16));
+  return {
+    fontFamily: d.font_family ?? "system-ui",
+    fontSize: `${size}px`,
+    fontWeight: d.font_weight ?? "normal",
+    fontStyle: d.font_style ?? "normal",
+  };
+});
+
 const containerStyle = computed(() => {
   const d = props.design;
   const pad = d.padding;
+  const rawBg = d.background_value;
   const bg =
-    d.background_type === "image" && d.background_value
-      ? `url("${d.background_value.replace(/\\/g, "\\\\").replace(/"/g, "%22")}")`
-      : d.background_value || "#FFFFFF";
+    d.background_type === "image" && rawBg && /^https?:\/\//i.test(rawBg)
+      ? `url("${encodeURI(rawBg).replace(/"/g, "%22")}")`
+      : rawBg || "#FFFFFF";
   return {
     aspectRatio: "4 / 5",
     padding: `${pad}px`,

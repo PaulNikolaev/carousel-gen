@@ -488,6 +488,36 @@ async def test_patch_carousel_design_not_found_404(client: AsyncClient) -> None:
     assert "detail" in response.json()
 
 
+async def test_patch_carousel_design_typography_200(client: AsyncClient) -> None:
+    """PATCH /carousels/{id}/design with typography returns 200 and design includes typography fields."""
+    create_resp = await client.post(
+        "/api/v1/carousels",
+        json={"title": "Typography Design", "source_type": "text"},
+    )
+    assert create_resp.status_code == 201
+    carousel_id = create_resp.json()["id"]
+
+    response = await client.patch(
+        f"/api/v1/carousels/{carousel_id}/design",
+        json={
+            "typography": {
+                "font_size": 20,
+                "font_family": "Arial",
+                "font_weight": "bold",
+                "font_style": "italic",
+            },
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert "design" in data
+    design = data["design"]
+    assert design["font_size"] == 20
+    assert design["font_family"] == "Arial"
+    assert design["font_weight"] == "bold"
+    assert design["font_style"] == "italic"
+
+
 async def test_patch_carousel_design_with_slide_id_200(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:

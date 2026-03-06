@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.config import get_settings
+from app.core.constants import ALLOWED_FONT_FAMILIES as _ALLOWED_FONT_FAMILIES
 from app.models.carousel import Carousel
 from app.models.carousel_design import CarouselDesign
 from app.models.enums import BackgroundTypeEnum, TemplateEnum
@@ -36,6 +37,13 @@ _BLOCKED_URL_PATTERNS = (
     r"^https?://0\.0\.0\.0",
 )
 _BLOCKED_URL_RE = re.compile("|".join(f"({p})" for p in _BLOCKED_URL_PATTERNS))
+
+def _safe_font_family(value: str | None) -> str:
+    """Return value if in whitelist, else system-ui."""
+    if not value or not isinstance(value, str):
+        return "system-ui"
+    v = value.strip()[:128]
+    return v if v in _ALLOWED_FONT_FAMILIES else "system-ui"
 
 
 def _safe_css_color(value: str | None) -> str:
@@ -67,6 +75,10 @@ def _effective_design(design: CarouselDesign, overrides: dict) -> dict:
         "header_text": design.header_text or "",
         "footer_enabled": design.footer_enabled,
         "footer_text": design.footer_text or "",
+        "font_size": design.font_size,
+        "font_family": design.font_family or "system-ui",
+        "font_weight": design.font_weight or "normal",
+        "font_style": design.font_style or "normal",
     }
     for key in base:
         if key in overrides and overrides[key] is not None:
@@ -84,6 +96,25 @@ def _build_slide_html(
     overrides: dict,
 ) -> str:
     eff = _effective_design(design, overrides)
+    font_size = max(12, min(32, eff.get("font_size", 16)))
+    font_family_css = _safe_font_family(eff.get("font_family"))
+    font_family_escaped = font_family_css.replace("\\", "\\\\").replace("'", "\\'")
+    if " " in font_family_escaped:
+        font_family_quoted = f"'{font_family_escaped}'"
+    else:
+        font_family_quoted = font_family_escaped
+    font_weight = eff.get("font_weight") or "normal"
+    if font_weight not in ("normal", "bold"):
+        font_weight = "normal"
+    font_style = eff.get("font_style") or "normal"
+    if font_style not in ("normal", "italic"):
+        font_style = "normal"
+    scale = font_size / 16.0
+    header_font_size = max(12, min(40, int(28 * scale)))
+    title_font_size = max(14, min(48, int(36 * scale)))
+    body_font_size = max(12, min(28, int(22 * scale)))
+    footer_font_size = max(12, min(40, int(28 * scale)))
+
     bg = eff["background_value"]
     if str(eff["background_type"]) == BackgroundTypeEnum.image.value and bg:
         safe_url = _safe_css_url(bg)
@@ -115,14 +146,14 @@ def _build_slide_html(
 <meta charset="utf-8">
 <style>
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{ width: {SLIDE_WIDTH}px; height: {SLIDE_HEIGHT}px; overflow: hidden; font-family: system-ui, sans-serif; {bg_style} position: relative; }}
+body {{ width: {SLIDE_WIDTH}px; height: {SLIDE_HEIGHT}px; overflow: hidden; font-family: {font_family_quoted}, sans-serif; font-size: {font_size}px; font-weight: {font_weight}; font-style: {font_style}; {bg_style} position: relative; }}
 .overlay {{ position: absolute; inset: 0; background: #000; pointer-events: none; }}
 .container {{ position: relative; z-index: 1; display: flex; flex-direction: column; height: 100%; padding: {padding}px; justify-content: space-between; }}
-.header {{ font-size: 28px; color: #333; flex-shrink: 0; }}
+.header {{ font-family: {font_family_quoted}, sans-serif; font-size: {header_font_size}px; font-weight: {font_weight}; font-style: {font_style}; color: #333; flex-shrink: 0; }}
 .main {{ flex: 1; display: flex; flex-direction: column; justify-content: {align}; align-items: {justify}; padding: 16px 0; }}
-.main h1 {{ font-size: 36px; margin-bottom: 12px; line-height: 1.2; }}
-.main .body {{ font-size: 22px; line-height: 1.4; white-space: pre-wrap; }}
-.footer {{ font-size: 28px; color: #333; flex-shrink: 0; }}
+.main h1 {{ font-family: {font_family_quoted}, sans-serif; font-size: {title_font_size}px; font-weight: {font_weight}; font-style: {font_style}; margin-bottom: 12px; line-height: 1.2; }}
+.main .body {{ font-family: {font_family_quoted}, sans-serif; font-size: {body_font_size}px; font-weight: {font_weight}; font-style: {font_style}; line-height: 1.4; white-space: pre-wrap; }}
+.footer {{ font-family: {font_family_quoted}, sans-serif; font-size: {footer_font_size}px; font-weight: {font_weight}; font-style: {font_style}; color: #333; flex-shrink: 0; }}
 </style>
 </head>
 <body>
@@ -220,6 +251,10 @@ async def render_carousel_to_zip(
             header_text="",
             footer_enabled=True,
             footer_text="",
+            font_size=16,
+            font_family="system-ui",
+            font_weight="normal",
+            font_style="normal",
         )
 
     slides = sorted(carousel.slides, key=lambda s: s.order)
