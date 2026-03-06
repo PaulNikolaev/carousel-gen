@@ -65,7 +65,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-      start_period: 10s
+      start_period: 20s
     volumes:
       - minio_data:/data
     ports:

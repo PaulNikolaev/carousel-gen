@@ -1,13 +1,13 @@
 <template>
   <div class="design-panel flex flex-col gap-4">
-    <div role="tablist" class="flex gap-1 rounded border border-gray-200 bg-gray-100/80 p-1">
+    <div role="tablist" class="flex flex-wrap justify-center gap-1.5 rounded border border-gray-200 bg-gray-100/80 p-1.5">
       <button
         v-for="tab in tabs"
         :key="tab.id"
         type="button"
         role="tab"
         :aria-selected="activeTab === tab.id"
-        class="flex-1 rounded px-2 py-1.5 text-xs font-medium transition-colors"
+        class="min-w-0 shrink-0 rounded px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap"
         :class="activeTab === tab.id ? 'bg-white text-primary shadow-sm' : 'text-gray-600 hover:text-gray-900'"
         @click="activeTab = tab.id"
       >
