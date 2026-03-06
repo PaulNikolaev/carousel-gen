@@ -66,16 +66,21 @@ def _validate_video_file(
         )
     if content_type not in VIDEO_MIME_TYPES:
         raise HTTPException(status_code=400, detail="Video content type not allowed")
-    if content:
-        kind = filetype.guess(content)
-        if kind is not None:
-            magic_ext = "." + kind.extension.lower()
-            magic_mime = kind.mime or ""
-            if magic_ext not in VIDEO_EXTENSIONS or magic_mime not in VIDEO_MIME_TYPES:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Only mp4, mov, avi video formats are allowed",
-                )
+    if not content:
+        raise HTTPException(status_code=400, detail="Empty file not allowed")
+    kind = filetype.guess(content)
+    if kind is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot determine file type from content",
+        )
+    magic_ext = "." + kind.extension.lower()
+    magic_mime = kind.mime or ""
+    if magic_ext not in VIDEO_EXTENSIONS or magic_mime not in VIDEO_MIME_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Only mp4, mov, avi video formats are allowed",
+        )
 
 
 @router.post("", response_model=CarouselResponse, status_code=201)
@@ -140,17 +145,34 @@ async def update_carousel(
     return carousel
 
 
+@router.delete("/{carousel_id:uuid}", status_code=204)
+async def delete_carousel(
+    carousel_id: UUID,
+    service: CarouselService = Depends(_get_service),
+) -> None:
+    deleted = await service.delete_carousel(carousel_id)
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Carousel not found")
+
+
 @router.get(
     "/{carousel_id:uuid}/design",
     response_model=DesignResponse,
 )
 async def get_carousel_design(
     carousel_id: UUID,
+    slide_id: UUID | None = Query(
+        None,
+        description="If set, return effective design for this slide (carousel + overrides)",
+    ),
     service: DesignService = Depends(_get_design_service),
 ) -> DesignResponse:
-    result = await service.get_design(carousel_id)
+    result = await service.get_design(carousel_id, slide_id=slide_id)
     if result is None:
-        raise HTTPException(status_code=404, detail="Carousel not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Carousel not found" if slide_id is None else "Carousel or slide not found",
+        )
     return result
 
 
@@ -163,15 +185,27 @@ async def update_carousel_design(
     payload: DesignUpdate,
     apply_to_all: bool = Query(
         False,
-        description="Reset design_overrides on all slides",
+        description="Apply to carousel and clear all slide overrides",
+    ),
+    slide_id: UUID | None = Query(
+        None,
+        description="If set and apply_to_all=false, update only this slide's design_overrides",
     ),
     service: DesignService = Depends(_get_design_service),
 ) -> CarouselWithDesignResponse:
     result = await service.update_design(
-        carousel_id, payload, apply_to_all=apply_to_all
+        carousel_id,
+        payload,
+        apply_to_all=apply_to_all,
+        slide_id=slide_id,
     )
     if result is None:
-        raise HTTPException(status_code=404, detail="Carousel not found")
+        raise HTTPException(
+            status_code=404,
+            detail="Carousel not found"
+            if slide_id is None or apply_to_all
+            else "Carousel or slide not found",
+        )
     return result
 
 

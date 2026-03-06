@@ -80,6 +80,8 @@
         v-for="carousel in items"
         :key="carousel.id"
         :carousel="carousel"
+        :deleting-id="deletingCarouselId"
+        @delete="onDeleteCarousel"
       />
     </div>
   </div>
@@ -91,15 +93,14 @@ import type { CarouselListResponse } from "~/types/carousel";
 const { request } = useApi();
 
 const items = ref<CarouselListResponse["items"]>([]);
-const pending = ref(true);
+const pending = ref(false);
 const error = ref<string | null>(null);
-const fetching = ref(false);
+const deletingCarouselId = ref<string | null>(null);
 
 let abortController: AbortController | null = null;
 
 async function fetchList() {
-  if (fetching.value) return;
-  fetching.value = true;
+  if (pending.value) return;
   error.value = null;
   pending.value = true;
 
@@ -115,8 +116,18 @@ async function fetchList() {
     error.value = "Не удалось загрузить список каруселей";
   } finally {
     pending.value = false;
-    fetching.value = false;
     abortController = null;
+  }
+}
+
+async function onDeleteCarousel(id: string) {
+  if (!confirm("Удалить эту карусель? Действие нельзя отменить.")) return;
+  deletingCarouselId.value = id;
+  try {
+    await request(`/api/v1/carousels/${id}`, { method: "DELETE" });
+    items.value = items.value.filter((c) => c.id !== id);
+  } finally {
+    deletingCarouselId.value = null;
   }
 }
 

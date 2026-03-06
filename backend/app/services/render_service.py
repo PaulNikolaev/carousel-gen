@@ -165,14 +165,18 @@ async def shutdown_browser() -> None:
             _playwright_cm = None
 
 
-async def _abort_route(route):
-    await route.abort()
+async def _route_handler(route):
+    """Abort only requests to blocked (internal/cloud) URLs; allow public https URLs (e.g. background-image)."""
+    if _BLOCKED_URL_RE.search(route.request.url):
+        await route.abort()
+    else:
+        await route.continue_()
 
 
 async def _screenshot_slide(browser, html_content: str) -> bytes:
     page = await browser.new_page(viewport={"width": SLIDE_WIDTH, "height": SLIDE_HEIGHT})
     try:
-        await page.route("**", _abort_route)
+        await page.route("**", _route_handler)
         await page.set_content(html_content, wait_until="domcontentloaded", timeout=5000)
         return await page.screenshot(type="png", timeout=10000)
     finally:

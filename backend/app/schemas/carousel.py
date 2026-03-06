@@ -31,11 +31,12 @@ class CarouselCreate(BaseModel):
 
 
 class CarouselUpdate(BaseModel):
-    """Payload for PATCH: update title, format and/or video_url."""
+    """Payload for PATCH: update title, format, video_url and/or video_transcript."""
 
     title: str | None = None
     format: FormatSchema | None = None
     video_url: str | None = None
+    video_transcript: str | None = None
 
     @field_validator("video_url")
     @classmethod

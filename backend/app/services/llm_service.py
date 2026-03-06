@@ -41,7 +41,17 @@ def _source_content_from_payload(source_payload: dict[str, Any]) -> str:
     if source_payload.get("notes"):
         parts.append("Notes: " + str(source_payload["notes"]).strip())
     if source_payload.get("video_key") or source_payload.get("video_url"):
-        raise NotImplementedError("Video transcription is not yet implemented")
+        transcript = (
+            source_payload.get("video_transcript")
+            or source_payload.get("source_text")
+        )
+        if transcript and str(transcript).strip():
+            parts.append("Video transcript / description:\n" + str(transcript).strip())
+        else:
+            raise ValueError(
+                "Для генерации из видео нужен текст: описание или расшифровка. "
+                "Добавьте его при создании карусели или в настройках."
+            )
     return "\n\n".join(parts) if parts else "No content provided."
 
 

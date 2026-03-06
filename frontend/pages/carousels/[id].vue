@@ -27,15 +27,44 @@
         <p v-if="tokensEstimate !== null" class="mb-4 text-gray-600">
           При генерации будет списано ориентировочно {{ tokensEstimate }} токенов.
         </p>
-        <button
-          type="button"
-          class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          :disabled="starting"
-          aria-label="Запустить генерацию слайдов"
-          @click="startGeneration"
-        >
-          {{ starting ? "Запуск…" : "Сгенерировать" }}
-        </button>
+        <template v-if="carousel.source_type === 'video'">
+          <div class="mb-4 space-y-2">
+            <label for="draft-video-transcript" class="block text-sm font-medium text-gray-700">Описание или расшифровка видео (нужно для генерации)</label>
+            <textarea
+              id="draft-video-transcript"
+              v-model="videoTranscriptEdit"
+              rows="4"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="Вставьте расшифровку или описание видео"
+            />
+            <button
+              type="button"
+              class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
+              :disabled="savingVideoTranscript"
+              @click="saveVideoTranscript"
+            >
+              {{ savingVideoTranscript ? 'Сохранение…' : 'Сохранить описание' }}
+            </button>
+          </div>
+        </template>
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            :disabled="starting"
+            aria-label="Запустить генерацию слайдов"
+            @click="startGeneration"
+          >
+            {{ starting ? "Запуск…" : "Сгенерировать" }}
+          </button>
+          <NuxtLink
+            to="/"
+            class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="Вернуться к списку каруселей"
+          >
+            Назад к списку
+          </NuxtLink>
+        </div>
       </template>
 
       <!-- Progress: queued / running (with optional generation_id from POST) or carousel.status=generating -->
@@ -53,6 +82,15 @@
         <p v-if="tokensEstimate !== null" class="mt-2 text-gray-600">
           Спишется ориентировочно {{ tokensEstimate }} токенов.
         </p>
+        <div class="mt-4">
+          <NuxtLink
+            to="/"
+            class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="Вернуться к списку каруселей"
+          >
+            Назад к списку
+          </NuxtLink>
+        </div>
       </template>
 
       <!-- Failed: message + Retry -->
@@ -61,16 +99,45 @@
           Ошибка генерации
         </h1>
         <p class="mb-4 text-gray-600">
-          {{ failedMessage }}
+          {{ failedMessageFriendly }}
         </p>
-        <button
-          type="button"
-          class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          aria-label="Повторить генерацию"
-          @click="startGeneration"
-        >
-          Повторить
-        </button>
+        <template v-if="carousel.source_type === 'video'">
+          <div class="mb-4 space-y-2">
+            <label for="failed-video-transcript" class="block text-sm font-medium text-gray-700">Описание или расшифровка видео (нужно для генерации)</label>
+            <textarea
+              id="failed-video-transcript"
+              v-model="videoTranscriptEdit"
+              rows="4"
+              class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+              placeholder="Вставьте расшифровку или описание видео"
+            />
+            <button
+              type="button"
+              class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
+              :disabled="savingVideoTranscript"
+              @click="saveVideoTranscript"
+            >
+              {{ savingVideoTranscript ? 'Сохранение…' : 'Сохранить описание' }}
+            </button>
+          </div>
+        </template>
+        <div class="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            class="inline-flex justify-center rounded-md bg-primary px-4 py-2 text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="Повторить генерацию"
+            @click="startGeneration"
+          >
+            Повторить
+          </button>
+          <NuxtLink
+            to="/"
+            class="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            aria-label="Вернуться к списку каруселей"
+          >
+            Назад к списку
+          </NuxtLink>
+        </div>
       </template>
 
       <!-- Editor: thumbnails | preview (4:5) | settings -->
@@ -501,10 +568,17 @@ const route = useRoute();
 const id = computed(() => route.params.id as string);
 
 const { request } = useApi();
+const _runtimeConfig = useRuntimeConfig();
+const _sseBaseUrl = (
+  ((_runtimeConfig.public.apiBaseUrl as string) || "http://localhost:8000").replace(/\/$/, "")
+);
+const _sseApiKey = ((_runtimeConfig.public.apiKey as string) || "");
 
 const carousel = ref<CarouselResponse | null>(null);
 const loadError = ref<string | null>(null);
 const starting = ref(false);
+const videoTranscriptEdit = ref("");
+const savingVideoTranscript = ref(false);
 const tokensEstimate = ref<number | null>(null);
 const activeGenerationId = ref<string | null>(null);
 const generation = ref<GenerationResponse | null>(null);
@@ -626,6 +700,17 @@ const failedMessage = computed(() => {
   return generation.value?.error_message || "Генерация не удалась.";
 });
 
+const failedMessageFriendly = computed(() => {
+  const msg = failedMessage.value;
+  if (
+    msg.includes("Video transcription") ||
+    msg.toLowerCase().includes("not yet implemented")
+  ) {
+    return "Для генерации из видео нужен текст: описание или расшифровка. Добавьте его при создании карусели или в настройках.";
+  }
+  return msg;
+});
+
 const currentSlide = computed(() => {
   const list = editorSlides.value;
   const idx = currentSlideIndex.value;
@@ -650,7 +735,7 @@ function syncEditFieldsFromSlide() {
   }
 }
 
-watch(currentSlide, syncEditFieldsFromSlide, { immediate: true });
+watch(currentSlideIndex, syncEditFieldsFromSlide, { immediate: true });
 
 function mergeDesignUpdate(prev: DesignUpdate, next: DesignUpdate): DesignUpdate {
   return {
@@ -716,10 +801,14 @@ function designSnapshotToUpdate(s: DesignSnapshot): DesignUpdate {
 
 async function fetchDesign() {
   try {
-    const res = await request<DesignResponse>(
-      `/api/v1/carousels/${id.value}/design`
-    );
-    editorDesign.value = { ...res.design };
+    const slideId = currentSlide.value?.id;
+    const url = slideId
+      ? `/api/v1/carousels/${id.value}/design?slide_id=${slideId}`
+      : `/api/v1/carousels/${id.value}/design`;
+    const res = await request<DesignResponse>(url);
+    if (currentSlide.value?.id === slideId) {
+      editorDesign.value = { ...res.design };
+    }
   } catch {
     // useApi shows toast; keep current editorDesign to avoid overwriting with defaults
   }
@@ -727,7 +816,12 @@ async function fetchDesign() {
 
 async function patchDesign(payload: DesignUpdate, applyToAll: boolean) {
   try {
-    const url = `/api/v1/carousels/${id.value}/design${applyToAll ? "?apply_to_all=true" : ""}`;
+    const params = new URLSearchParams();
+    if (applyToAll) params.set("apply_to_all", "true");
+    const slideId = currentSlide.value?.id;
+    if (!applyToAll && slideId) params.set("slide_id", slideId);
+    const qs = params.toString();
+    const url = `/api/v1/carousels/${id.value}/design${qs ? `?${qs}` : ""}`;
     const data = await request<CarouselWithDesignResponse>(url, {
       method: "PATCH",
       body: payload,
@@ -774,10 +868,13 @@ async function patchSlide(payload: SlideUpdate) {
       `/api/v1/carousels/${id.value}/slides/${s.id}`,
       { method: "PATCH", body: payload }
     );
-    const list = [...editorSlides.value];
     const idx = editorSlides.value.findIndex((x) => x.id === s.id);
-    if (idx !== -1) list[idx] = updated;
-    editorSlides.value = list;
+    if (idx !== -1) {
+      const slide = editorSlides.value[idx];
+      if (updated.title !== undefined) slide.title = updated.title;
+      if (updated.body !== undefined) slide.body = updated.body;
+      if (updated.footer !== undefined) slide.footer = updated.footer;
+    }
   } catch {
     // useApi shows toast
   }
@@ -816,9 +913,27 @@ async function fetchCarousel() {
     carousel.value = await request<CarouselResponse>(
       `/api/v1/carousels/${id.value}`
     );
+    if (carousel.value?.source_type === "video" && carousel.value?.source_payload) {
+      const t = carousel.value.source_payload.video_transcript;
+      videoTranscriptEdit.value = typeof t === "string" ? t : "";
+    }
   } catch {
     loadError.value = "Карусель не найдена.";
     carousel.value = null;
+  }
+}
+
+async function saveVideoTranscript() {
+  if (!id.value || savingVideoTranscript.value) return;
+  savingVideoTranscript.value = true;
+  try {
+    await request<CarouselResponse>(`/api/v1/carousels/${id.value}`, {
+      method: "PATCH",
+      body: { video_transcript: videoTranscriptEdit.value },
+    });
+    await fetchCarousel();
+  } finally {
+    savingVideoTranscript.value = false;
   }
 }
 
@@ -855,15 +970,11 @@ function startGenerationSSE() {
   const genId = activeGenerationId.value;
   if (!genId) return;
   closeGenerationSSE();
-  const config = useRuntimeConfig();
-  const baseUrl = (
-    (config.public.apiBaseUrl as string) || "http://localhost:8000"
-  ).replace(/\/$/, "");
-  const apiKey = (config.public.apiKey as string) || "";
+  const baseUrl = _sseBaseUrl;
+  const apiKey = _sseApiKey;
   let streamUrl = `${baseUrl}/api/v1/generations/${genId}/stream`;
-  // EventSource does not support custom headers; send api_key as query param instead.
   if (apiKey) {
-    streamUrl += `${streamUrl.includes("?") ? "&" : "?"}api_key=${encodeURIComponent(apiKey)}`;
+    streamUrl += `?api_key=${encodeURIComponent(apiKey)}`;
   }
   const es = new EventSource(streamUrl);
   generationEventSource = es;
@@ -877,6 +988,7 @@ function startGenerationSSE() {
         closeGenerationSSE();
         await fetchCarousel();
         await ensureEditorSlides();
+        await fetchGenerations();
       } else if (data.status === "failed") {
         closeGenerationSSE();
         await fetchCarousel();
@@ -912,15 +1024,11 @@ function startExportSSE() {
   const expId = exportId.value;
   if (!expId) return;
   closeExportSSE();
-  const config = useRuntimeConfig();
-  const baseUrl = (
-    (config.public.apiBaseUrl as string) || "http://localhost:8000"
-  ).replace(/\/$/, "");
-  const apiKey = (config.public.apiKey as string) || "";
+  const baseUrl = _sseBaseUrl;
+  const apiKey = _sseApiKey;
   let streamUrl = `${baseUrl}/api/v1/exports/${expId}/stream`;
-  // EventSource does not support custom headers; send api_key as query param instead.
   if (apiKey) {
-    streamUrl += `${streamUrl.includes("?") ? "&" : "?"}api_key=${encodeURIComponent(apiKey)}`;
+    streamUrl += `?api_key=${encodeURIComponent(apiKey)}`;
   }
   const es = new EventSource(streamUrl);
   exportEventSource = es;
@@ -970,6 +1078,7 @@ async function ensureEditorSlides() {
     );
     editorSlides.value = slides;
     if (currentSlideIndex.value >= slides.length) currentSlideIndex.value = Math.max(0, slides.length - 1);
+    syncEditFieldsFromSlide();
   } catch {
     editorSlides.value = [];
   } finally {
@@ -1041,11 +1150,22 @@ watch(
   () => viewMode.value,
   async (mode) => {
     if (mode === "editor") {
-      await Promise.all([ensureEditorSlides(), fetchDesign(), fetchGenerations()]);
+      await ensureEditorSlides();
+      await Promise.all([fetchDesign(), fetchGenerations()]);
     }
   },
   { immediate: true }
 );
+
+watch(currentSlideIndex, () => {
+  if (viewMode.value !== "editor" || editorSlides.value.length === 0) return;
+  if (designDebounceTimer) {
+    clearTimeout(designDebounceTimer);
+    designDebounceTimer = null;
+  }
+  pendingDesignPatch.value = {};
+  fetchDesign();
+});
 
 watch(
   () => carousel.value?.status,

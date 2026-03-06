@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.slide import Slide
 
 
-@pytest.mark.asyncio
 async def test_get_slides_carousel_not_found_404(client: AsyncClient) -> None:
     """GET /carousels/{id}/slides returns 404 when carousel does not exist."""
     response = await client.get(
@@ -19,7 +18,6 @@ async def test_get_slides_carousel_not_found_404(client: AsyncClient) -> None:
     assert "detail" in response.json()
 
 
-@pytest.mark.asyncio
 async def test_get_slides_empty_list_200(client: AsyncClient) -> None:
     """Create carousel (no slides), GET slides → 200 and empty list."""
     create_resp = await client.post(
@@ -33,7 +31,6 @@ async def test_get_slides_empty_list_200(client: AsyncClient) -> None:
     assert response.json() == []
 
 
-@pytest.mark.asyncio
 async def test_get_slides_ordered_200(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:
@@ -60,7 +57,6 @@ async def test_get_slides_ordered_200(
     assert data[1]["order"] == 1 and data[1]["title"] == "First"
 
 
-@pytest.mark.asyncio
 async def test_patch_slide_200(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:
@@ -99,7 +95,6 @@ async def test_patch_slide_200(
     assert data["footer"] == "New footer"
 
 
-@pytest.mark.asyncio
 async def test_patch_slide_not_found_404(client: AsyncClient) -> None:
     """PATCH /carousels/{id}/slides/{slide_id} returns 404 when slide does not exist."""
     create_resp = await client.post(
@@ -118,7 +113,6 @@ async def test_patch_slide_not_found_404(client: AsyncClient) -> None:
     assert "detail" in response.json()
 
 
-@pytest.mark.asyncio
 async def test_patch_slide_carousel_not_found_404(client: AsyncClient) -> None:
     """PATCH with non-existent carousel_id returns 404."""
     fake_carousel_id = "00000000-0000-0000-0000-000000000001"

@@ -49,16 +49,20 @@ def _validate_file(
             raise HTTPException(status_code=400, detail="Content type not allowed")
     if content:
         kind = filetype.guess(content)
-        if kind is not None:
-            magic_ext = "." + kind.extension.lower()
-            magic_mime = kind.mime or ""
-            if magic_ext in BLOCKED_EXTENSIONS or magic_ext not in ALLOWED_EXTENSIONS:
-                raise HTTPException(status_code=400, detail="File type not allowed")
-            if not (
-                magic_mime.startswith(ALLOWED_MIME_PREFIXES)
-                or magic_mime in ALLOWED_MIME_EXACT
-            ):
-                raise HTTPException(status_code=400, detail="Content type not allowed")
+        if kind is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Cannot determine file type from content",
+            )
+        magic_ext = "." + kind.extension.lower()
+        magic_mime = kind.mime or ""
+        if magic_ext in BLOCKED_EXTENSIONS or magic_ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(status_code=400, detail="File type not allowed")
+        if not (
+            magic_mime.startswith(ALLOWED_MIME_PREFIXES)
+            or magic_mime in ALLOWED_MIME_EXACT
+        ):
+            raise HTTPException(status_code=400, detail="Content type not allowed")
 
 
 @router.post("/upload")

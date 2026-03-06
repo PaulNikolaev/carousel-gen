@@ -32,13 +32,21 @@ class CarouselService:
 
     async def create_draft(self, payload: CarouselCreate) -> CarouselResponse:
         format_dict = _format_to_dict(payload.format)
+        slides_count = (
+            payload.format.slides_count
+            if payload.format.slides_count is not None
+            else payload.slides_count
+        )
+        language = (
+            (payload.format.language or "").strip() or payload.language
+        )
         carousel = await self._repo.create(
             title=payload.title,
             source_type=payload.source_type,
             source_payload=payload.source_payload,
             format=format_dict,
-            language=payload.language,
-            slides_count=payload.slides_count,
+            language=language,
+            slides_count=slides_count,
         )
         return carousel_to_response(carousel, self._preview_base_url)
 
@@ -72,12 +80,15 @@ class CarouselService:
             return None
         format_dict = _format_to_dict(payload.format) if payload.format is not None else None
         source_payload = None
-        if payload.video_url is not None:
+        if payload.video_url is not None or payload.video_transcript is not None:
             if carousel.source_type != SourceTypeEnum.video:
-                raise ValueError("video_url can only be set for video carousels")
+                raise ValueError("video_url and video_transcript only for video carousels")
             merged = dict(carousel.source_payload or {})
-            merged["video_url"] = payload.video_url
-            merged.pop("video_key", None)
+            if payload.video_url is not None:
+                merged["video_url"] = payload.video_url
+                merged.pop("video_key", None)
+            if payload.video_transcript is not None:
+                merged["video_transcript"] = payload.video_transcript
             source_payload = merged
         updated = await self._repo.update(
             carousel,
@@ -99,3 +110,7 @@ class CarouselService:
         merged.pop("video_url", None)
         updated = await self._repo.update(carousel, source_payload=merged)
         return carousel_to_response(updated, self._preview_base_url)
+
+    async def delete_carousel(self, carousel_id: UUID) -> bool:
+        """Delete carousel by id. Returns True if deleted, False if not found."""
+        return await self._repo.delete_by_id(carousel_id)

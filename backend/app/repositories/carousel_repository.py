@@ -96,3 +96,12 @@ class CarouselRepository:
         await self._session.flush()
         await self._session.refresh(carousel)
         return carousel
+
+    async def delete_by_id(self, carousel_id: UUID) -> bool:
+        """Delete carousel by id. Returns True if deleted, False if not found."""
+        carousel = await self.get_by_id(carousel_id)
+        if carousel is None:
+            return False
+        await self._session.delete(carousel)
+        await self._session.flush()
+        return True

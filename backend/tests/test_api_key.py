@@ -1,4 +1,4 @@
-"""Tests for API key middleware: 401 when key missing/wrong, 200 with header or query, health excluded."""
+"""Tests for API key middleware: 401 when key missing/wrong, 200 with X-API-Key header, health excluded."""
 
 import pytest
 from httpx import AsyncClient
@@ -17,7 +17,6 @@ def _clear_settings_cache():
         get_settings.cache_clear()
 
 
-@pytest.mark.asyncio
 async def test_no_key_returns_401_when_api_key_set(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -26,10 +25,9 @@ async def test_no_key_returns_401_when_api_key_set(
     get_settings.cache_clear()
     response = await client.get("/api/v1/carousels")
     assert response.status_code == 401
-    assert response.json() == {"detail": "Invalid or missing API key"}
+    assert response.json() == {"detail": "Invalid or missing API key", "code": 401}
 
 
-@pytest.mark.asyncio
 async def test_valid_header_returns_200(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -43,18 +41,6 @@ async def test_valid_header_returns_200(
     assert response.status_code == 200
 
 
-@pytest.mark.asyncio
-async def test_valid_query_returns_200(
-    client: AsyncClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """When API_KEY is set, request with api_key query returns 200."""
-    monkeypatch.setenv("API_KEY", "secret-key")
-    get_settings.cache_clear()
-    response = await client.get("/api/v1/carousels?api_key=secret-key")
-    assert response.status_code == 200
-
-
-@pytest.mark.asyncio
 async def test_health_excluded_from_auth(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -66,7 +52,6 @@ async def test_health_excluded_from_auth(
     assert response.json() == {"status": "ok"}
 
 
-@pytest.mark.asyncio
 async def test_api_key_empty_skips_check(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:

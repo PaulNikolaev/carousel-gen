@@ -36,7 +36,6 @@ async def client_with_mock_storage(client: AsyncClient):
         app.dependency_overrides.pop(_get_storage, None)
 
 
-@pytest.mark.asyncio
 async def test_post_export_202(client: AsyncClient) -> None:
     """POST /exports with valid carousel_id returns 202 and export_id."""
     create_resp = await client.post(
@@ -56,7 +55,6 @@ async def test_post_export_202(client: AsyncClient) -> None:
     assert data["export_id"] is not None
 
 
-@pytest.mark.asyncio
 async def test_post_export_carousel_not_found_404(client: AsyncClient) -> None:
     """POST /exports with non-existent carousel_id returns 404."""
     fake_carousel_id = "00000000-0000-0000-0000-000000000001"
@@ -70,7 +68,6 @@ async def test_post_export_carousel_not_found_404(client: AsyncClient) -> None:
     assert "carousel" in data["detail"].lower() or "not found" in data["detail"].lower()
 
 
-@pytest.mark.asyncio
 async def test_get_export_200(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:
@@ -101,7 +98,6 @@ async def test_get_export_200(
     assert "error_message" in data
 
 
-@pytest.mark.asyncio
 async def test_get_export_not_found_404(client: AsyncClient) -> None:
     """GET /exports/{id} returns 404 for non-existent export."""
     fake_export_id = "00000000-0000-0000-0000-000000000002"
@@ -112,7 +108,6 @@ async def test_get_export_not_found_404(client: AsyncClient) -> None:
     assert "export" in data["detail"].lower() or "not found" in data["detail"].lower()
 
 
-@pytest.mark.asyncio
 async def test_get_export_done_has_download_url(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:
@@ -149,7 +144,6 @@ async def test_get_export_done_has_download_url(
         app.dependency_overrides.pop(_get_storage, None)
 
 
-@pytest.mark.asyncio
 async def test_post_export_invalid_carousel_id_422(client: AsyncClient) -> None:
     """POST /exports with invalid carousel_id (not UUID) returns 422."""
     response = await client.post(
@@ -159,14 +153,12 @@ async def test_post_export_invalid_carousel_id_422(client: AsyncClient) -> None:
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_post_export_missing_carousel_id_422(client: AsyncClient) -> None:
     """POST /exports without carousel_id returns 422."""
     response = await client.post("/api/v1/exports", json={})
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_get_export_stream_404(client: AsyncClient) -> None:
     """GET /exports/{id}/stream returns 404 for non-existent export."""
     response = await client.get(
@@ -175,7 +167,6 @@ async def test_get_export_stream_404(client: AsyncClient) -> None:
     assert response.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_get_export_stream_200_sends_events(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:

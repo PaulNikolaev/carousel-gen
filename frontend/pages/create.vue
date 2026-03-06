@@ -88,9 +88,52 @@
           class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
           placeholder="https://…"
         />
-        <p class="text-sm text-gray-500">
-          Файл можно загрузить после создания карусели в редакторе.
-        </p>
+        <div class="space-y-2">
+          <label class="block text-sm font-medium text-gray-700">Видеофайл</label>
+          <input
+            ref="videoFileInput"
+            type="file"
+            accept=".mp4,.mov,.avi,video/mp4,video/quicktime,video/x-msvideo"
+            class="hidden"
+            aria-label="Выбрать видеофайл"
+            @change="onVideoFileChange"
+          >
+          <div class="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              class="inline-flex items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              @click="videoFileInput?.click()"
+            >
+              Загрузить файл
+            </button>
+            <template v-if="videoFile">
+              <span class="text-sm text-gray-700">{{ videoFile.name }}</span>
+              <button
+                type="button"
+                class="text-sm text-gray-600 underline hover:text-gray-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded"
+                @click="clearVideoFile"
+              >
+                Удалить файл
+              </button>
+            </template>
+          </div>
+          <p class="text-sm text-gray-500">
+            mp4, mov или avi, до 50 МБ. Можно указать ссылку выше или загрузить файл.
+          </p>
+        </div>
+        <div class="space-y-2">
+          <label for="video-transcript" class="block text-sm font-medium text-gray-700">Описание или расшифровка видео (для генерации слайдов)</label>
+          <textarea
+            id="video-transcript"
+            v-model="payloadVideoTranscript"
+            rows="5"
+            class="w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 shadow-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+            placeholder="Вставьте расшифровку видео или краткое описание содержимого — по нему будут сгенерированы слайды."
+          />
+          <p class="text-sm text-gray-500">
+            Без этого текста генерация слайдов из видео будет недоступна. Можно добавить позже в редакторе.
+          </p>
+        </div>
       </div>
 
       <div v-else-if="sourceType === 'links'" class="space-y-4">
@@ -225,8 +268,6 @@
 <script setup lang="ts">
 import type { CarouselResponse, CreateCarouselPayload, SourceType } from "~/types/carousel";
 
-definePageMeta({ layout: "default" });
-
 const { request } = useApi();
 
 const step = ref(0);
@@ -234,7 +275,10 @@ const sourceType = ref<SourceType | null>(null);
 
 const payloadText = ref("");
 const payloadVideoUrl = ref("");
+const payloadVideoTranscript = ref("");
 const payloadLinksText = ref("");
+const videoFile = ref<File | null>(null);
+const videoFileInput = ref<HTMLInputElement | null>(null);
 
 const formatSlidesCount = ref(8);
 const formatLanguage = ref<"ru" | "en" | "fr">("ru");
@@ -251,9 +295,22 @@ function chooseSource(type: SourceType) {
   inputError.value = "";
   payloadText.value = "";
   payloadVideoUrl.value = "";
+  payloadVideoTranscript.value = "";
   payloadLinksText.value = "";
+  videoFile.value = null;
   step.value = 1;
   nextTick(() => step1Heading.value?.focus());
+}
+
+function onVideoFileChange(e: Event) {
+  const target = e.target as HTMLInputElement;
+  const file = target.files?.[0];
+  videoFile.value = file ?? null;
+}
+
+function clearVideoFile() {
+  videoFile.value = null;
+  if (videoFileInput.value) videoFileInput.value.value = "";
 }
 
 function goBack() {
@@ -319,7 +376,11 @@ function buildSourcePayload(): Record<string, unknown> {
   }
   if (sourceType.value === "video") {
     const url = payloadVideoUrl.value.trim();
-    return url ? { video_url: url } : {};
+    const transcript = payloadVideoTranscript.value.trim();
+    const out: Record<string, unknown> = {};
+    if (url) out.video_url = url;
+    if (transcript) out.video_transcript = transcript;
+    return out;
   }
   if (sourceType.value === "links") {
     const urls = payloadLinksText.value
@@ -352,6 +413,14 @@ async function submit() {
       method: "POST",
       body: payload,
     });
+    if (sourceType.value === "video" && videoFile.value) {
+      const form = new FormData();
+      form.append("file", videoFile.value);
+      await request<CarouselResponse>(`/api/v1/carousels/${data.id}/video`, {
+        method: "POST",
+        body: form,
+      });
+    }
     await navigateTo(`/carousels/${data.id}`);
   } catch {
     // handled by useApi toast

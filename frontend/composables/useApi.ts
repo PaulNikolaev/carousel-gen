@@ -3,7 +3,6 @@ import type { FetchError } from "ofetch";
 export function useApi() {
   const config = useRuntimeConfig();
   const baseUrl = (
-    (config.apiBaseUrl as string | undefined) ||
     (config.public.apiBaseUrl as string) ||
     "http://localhost:8000"
   ).replace(/\/$/, "");

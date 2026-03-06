@@ -70,8 +70,12 @@ async def _run_export_task(export_id: UUID) -> None:
                         error_message=repr(e),
                     )
                     await session.commit()
-            except Exception:
-                pass
+            except Exception as recovery_exc:
+                logger.warning(
+                    "export_status_update_failed",
+                    export_id=str(export_id),
+                    error=repr(recovery_exc),
+                )
 
 
 class ExportService:

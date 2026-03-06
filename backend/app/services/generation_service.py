@@ -39,12 +39,17 @@ async def _run_generation_task(generation_id: UUID) -> None:
             await gen_repo.update(gen, status=GenerationStatusEnum.running)
 
             style_hint = None
+            slides_count = carousel.slides_count
             if isinstance(carousel.format, dict):
                 style_hint = carousel.format.get("style_hint")
+                if slides_count <= 0:
+                    slides_count = carousel.format.get("slides_count") or 8
+            if slides_count <= 0:
+                slides_count = 8
             slides_result, tokens_used = await generate_slides(
                 carousel.source_payload,
                 carousel.language,
-                carousel.slides_count,
+                slides_count,
                 style_hint=style_hint,
             )
 
@@ -91,7 +96,7 @@ async def _run_generation_task(generation_id: UUID) -> None:
                         await gen_repo2.update(
                             gen,
                             status=GenerationStatusEnum.failed,
-                            error_message=repr(e),
+                            error_message=str(e),
                         )
                         if gen.carousel:
                             await carousel_repo2.update(
@@ -139,7 +144,7 @@ class GenerationService:
         )
         if active is not None or carousel.status not in allowed_statuses:
             raise CarouselConflictError()
-        tokens_estimate = 0
+        tokens_estimate = -1  # reserved: pre-run token count not implemented
         gen = await self._gen_repo.create(
             carousel_id=carousel_id,
             tokens_estimate=tokens_estimate,

@@ -72,7 +72,7 @@ const containerStyle = computed(() => {
   const pad = d.padding;
   const bg =
     d.background_type === "image" && d.background_value
-      ? `url(${d.background_value})`
+      ? `url("${d.background_value.replace(/\\/g, "\\\\").replace(/"/g, "%22")}")`
       : d.background_value || "#FFFFFF";
   return {
     aspectRatio: "4 / 5",

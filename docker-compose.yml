@@ -50,9 +50,8 @@ services:
     environment:
       NUXT_API_BASE_URL: "http://backend:8000"
       NUXT_PUBLIC_API_BASE_URL: ${NUXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
-    volumes:
-      - ./frontend:/app
-      - frontend_node_modules:/app/node_modules
+    # Без монтирования ./frontend — в контейнере используется собранный .output из образа.
+    # Для live-reload фронта запускайте локально: cd frontend && npm run dev
     restart: unless-stopped
 
   minio:

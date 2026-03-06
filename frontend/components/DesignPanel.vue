@@ -306,8 +306,9 @@ function onColorInput(e: Event) {
 }
 
 function onColorTextInput(e: Event) {
-  const v = (e.target as HTMLInputElement).value;
-  emit("update", { background: { value: v || "#FFFFFF" } });
+  const v = (e.target as HTMLInputElement).value.trim();
+  if (!v) return;
+  emit("update", { background: { value: v } });
 }
 
 function onOverlayInput(e: Event) {

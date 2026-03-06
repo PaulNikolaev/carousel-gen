@@ -23,7 +23,6 @@ async def draft_carousel_id(client: AsyncClient) -> str:
     return create_resp.json()["id"]
 
 
-@pytest.mark.asyncio
 async def test_start_generation_202(client: AsyncClient, draft_carousel_id: str) -> None:
     """POST /generations with valid draft carousel_id returns 202 and generation_id, tokens_estimate."""
     response = await client.post(
@@ -34,11 +33,10 @@ async def test_start_generation_202(client: AsyncClient, draft_carousel_id: str)
     data = response.json()
     assert "generation_id" in data
     assert "tokens_estimate" in data
-    assert data["tokens_estimate"] >= 0
+    assert data["tokens_estimate"] == -1  # reserved: pre-run token count not implemented
     assert data["generation_id"] != draft_carousel_id
 
 
-@pytest.mark.asyncio
 async def test_start_generation_202_carousel_becomes_generating(
     client: AsyncClient, draft_carousel_id: str
 ) -> None:
@@ -53,7 +51,6 @@ async def test_start_generation_202_carousel_becomes_generating(
     assert carousel_resp.json()["status"] == "generating"
 
 
-@pytest.mark.asyncio
 async def test_start_generation_when_ready_202(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:
@@ -83,7 +80,6 @@ async def test_start_generation_when_ready_202(
     assert carousel_resp.json()["status"] == "generating"
 
 
-@pytest.mark.asyncio
 async def test_start_generation_when_failed_202(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:
@@ -113,7 +109,6 @@ async def test_start_generation_when_failed_202(
     assert carousel_resp.json()["status"] == "generating"
 
 
-@pytest.mark.asyncio
 async def test_start_generation_carousel_not_found_404(client: AsyncClient) -> None:
     """POST /generations with non-existent carousel_id returns 404 (CarouselNotFoundError)."""
     response = await client.post(
@@ -126,7 +121,6 @@ async def test_start_generation_carousel_not_found_404(client: AsyncClient) -> N
     assert "not found" in data["detail"].lower()
 
 
-@pytest.mark.asyncio
 async def test_start_generation_carousel_conflict_409(client: AsyncClient) -> None:
     """POST /generations when carousel is not draft or has active generation returns 409 (CarouselConflictError)."""
     create_resp = await client.post(
@@ -148,14 +142,12 @@ async def test_start_generation_carousel_conflict_409(client: AsyncClient) -> No
     assert "draft" in data["detail"].lower() or "active" in data["detail"].lower()
 
 
-@pytest.mark.asyncio
 async def test_start_generation_invalid_body_422(client: AsyncClient) -> None:
     """POST /generations with missing carousel_id returns 422."""
     response = await client.post("/api/v1/generations", json={})
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_start_generation_invalid_uuid_422(client: AsyncClient) -> None:
     """POST /generations with invalid UUID format returns 422."""
     response = await client.post(
@@ -165,7 +157,6 @@ async def test_start_generation_invalid_uuid_422(client: AsyncClient) -> None:
     assert response.status_code == 422
 
 
-@pytest.mark.asyncio
 async def test_get_generation_200(client: AsyncClient) -> None:
     """GET /generations/{id} returns 200 with full generation payload."""
     create_resp = await client.post(
@@ -196,7 +187,6 @@ async def test_get_generation_200(client: AsyncClient) -> None:
     assert "updated_at" in data
 
 
-@pytest.mark.asyncio
 async def test_get_generation_not_found_404(client: AsyncClient) -> None:
     """GET /generations/{id} returns 404 for non-existent generation."""
     response = await client.get(
@@ -206,14 +196,12 @@ async def test_get_generation_not_found_404(client: AsyncClient) -> None:
     assert "detail" in response.json()
 
 
-@pytest.mark.asyncio
 async def test_get_generation_invalid_uuid_404(client: AsyncClient) -> None:
     """GET /generations/{id} with non-UUID path does not match route; FastAPI returns 404."""
     response = await client.get("/api/v1/generations/not-a-uuid")
     assert response.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_get_generation_stream_404(client: AsyncClient) -> None:
     """GET /generations/{id}/stream returns 404 for non-existent generation."""
     response = await client.get(
@@ -222,7 +210,6 @@ async def test_get_generation_stream_404(client: AsyncClient) -> None:
     assert response.status_code == 404
 
 
-@pytest.mark.asyncio
 async def test_get_generation_stream_200_sends_events(
     client_and_session: tuple[AsyncClient, AsyncSession],
 ) -> None:

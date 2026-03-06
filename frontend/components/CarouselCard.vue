@@ -35,7 +35,7 @@
           {{ languageLabel }} · {{ slidesLabel }}
         </span>
       </div>
-      <div class="mt-4 flex flex-1 items-end">
+      <div class="mt-4 flex flex-1 flex-col gap-2 items-stretch">
         <NuxtLink
           :to="editorPath"
           class="inline-flex w-full justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-primary/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
@@ -43,6 +43,15 @@
         >
           {{ cardButtonLabel }}
         </NuxtLink>
+        <button
+          type="button"
+          class="inline-flex w-full justify-center rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition-colors hover:bg-gray-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
+          :aria-label="`Удалить карусель: ${carousel.title || 'Без названия'}`"
+          :disabled="deleting"
+          @click.prevent="onDeleteClick"
+        >
+          {{ deleting ? 'Удаление…' : 'Удалить' }}
+        </button>
       </div>
     </div>
   </article>
@@ -51,9 +60,23 @@
 <script setup lang="ts">
 import type { CarouselResponse, CarouselStatus } from "~/types/carousel";
 
-const props = defineProps<{
-  carousel: CarouselResponse;
+const props = withDefaults(
+  defineProps<{
+    carousel: CarouselResponse;
+    deletingId?: string | null;
+  }>(),
+  { deletingId: null }
+);
+
+const emit = defineEmits<{
+  delete: [id: string];
 }>();
+
+const deleting = computed(() => props.deletingId === props.carousel.id);
+
+function onDeleteClick() {
+  emit("delete", props.carousel.id);
+}
 
 const titleId = computed(() => `carousel-title-${props.carousel.id}`);
 const previewError = ref(false);
