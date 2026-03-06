@@ -59,7 +59,11 @@ class GenerationRepository:
     async def get_by_id(
         self, generation_id: UUID, *, load_carousel: bool = False
     ) -> Generation | None:
-        q = select(Generation).where(Generation.id == generation_id)
+        q = (
+            select(Generation)
+            .where(Generation.id == generation_id)
+            .execution_options(populate_existing=True)
+        )
         if load_carousel:
             q = q.options(selectinload(Generation.carousel))
         result = await self._session.execute(q)

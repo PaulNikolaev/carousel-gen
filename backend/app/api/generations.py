@@ -8,7 +8,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_db
+from app.core.database import async_session_factory, get_db
 from app.core.exceptions import CarouselConflictError, CarouselNotFoundError
 from app.models.enums import GenerationStatusEnum
 from app.models.generation import Generation
@@ -18,6 +18,7 @@ from app.schemas.generation import (
     StartGenerationRequest,
     StartGenerationResponse,
 )
+from app.repositories.generation_repository import GenerationRepository
 from app.services.generation_service import GenerationService
 
 router = APIRouter(prefix="/generations", tags=["generations"])
@@ -87,17 +88,23 @@ async def get_generation(
 
 async def _generation_stream_events(
     generation_id: UUID,
-    service: GenerationService,
 ):
-    """Async generator: yield SSE data lines until status is done or failed."""
+    """Async generator: yield SSE data lines until status is done or failed.
+
+    Uses a fresh DB session per iteration to always read the latest committed
+    status (avoids SQLAlchemy identity-map caching stale data).
+    """
     while True:
-        gen = await service.get_by_id(generation_id)
-        if gen is None:
-            return
-        resp = _generation_to_response(gen)
+        async with async_session_factory() as session:
+            repo = GenerationRepository(session)
+            gen = await repo.get_by_id(generation_id)
+            if gen is None:
+                return
+            resp = _generation_to_response(gen)
+            is_terminal = gen.status in (GenerationStatusEnum.done, GenerationStatusEnum.failed)
         payload = resp.model_dump(mode="json")
         yield f"data: {json.dumps(payload)}\n\n"
-        if gen.status in (GenerationStatusEnum.done, GenerationStatusEnum.failed):
+        if is_terminal:
             return
         await asyncio.sleep(SSE_POLL_INTERVAL)
 
@@ -112,7 +119,7 @@ async def stream_generation(
     if gen is None:
         raise HTTPException(status_code=404, detail="Generation not found")
     return StreamingResponse(
-        _generation_stream_events(generation_id, service),
+        _generation_stream_events(generation_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

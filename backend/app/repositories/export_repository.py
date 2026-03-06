@@ -38,7 +38,9 @@ class ExportRepository:
 
     async def get_by_id(self, export_id: UUID) -> Export | None:
         result = await self._session.execute(
-            select(Export).where(Export.id == export_id)
+            select(Export)
+            .where(Export.id == export_id)
+            .execution_options(populate_existing=True)
         )
         return result.scalar_one_or_none()
 

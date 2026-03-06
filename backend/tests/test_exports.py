@@ -14,7 +14,7 @@ from app.repositories.export_repository import ExportRepository
 
 
 class MockStorageService:
-    """Mock StorageService: generate_presigned_url returns fixed URL without S3."""
+    """Mock StorageService: presigned URL and get_object_bytes without S3."""
 
     async def generate_presigned_url(
         self,
@@ -23,6 +23,13 @@ class MockStorageService:
         expires_in: int = 3600,
     ) -> str:
         return f"https://mock.example/download/{key}"
+
+    async def get_object_bytes(
+        self,
+        key: str,
+        bucket: str | None = None,
+    ) -> bytes:
+        return b"PK\x03\x04"  # minimal zip magic bytes
 
 
 @pytest.fixture
@@ -140,6 +147,41 @@ async def test_get_export_done_has_download_url(
         assert data["status"] == "done"
         assert data["download_url"] is not None
         assert "mock.example" in data["download_url"] or "download" in data["download_url"]
+    finally:
+        app.dependency_overrides.pop(_get_storage, None)
+
+
+async def test_get_export_download_200(
+    client_and_session: tuple[AsyncClient, AsyncSession],
+) -> None:
+    """GET /exports/{id}/download when status=done returns 200 and ZIP body."""
+    client, session = client_and_session
+    app.dependency_overrides[_get_storage] = lambda: MockStorageService()
+    try:
+        create_resp = await client.post(
+            "/api/v1/carousels",
+            json={"title": "Download Export Carousel", "source_type": "text"},
+        )
+        assert create_resp.status_code == 201
+        carousel_id = create_resp.json()["id"]
+
+        export_repo = ExportRepository(session)
+        export = await export_repo.create(
+            carousel_id=UUID(carousel_id) if isinstance(carousel_id, str) else carousel_id
+        )
+        await export_repo.update(
+            export,
+            status=ExportStatusEnum.done,
+            s3_key="exports/fake/archive.zip",
+        )
+        await session.flush()
+        export_id = str(export.id)
+
+        response = await client.get(f"/api/v1/exports/{export_id}/download")
+        assert response.status_code == 200
+        assert response.headers.get("content-type", "").startswith("application/zip")
+        assert "attachment" in response.headers.get("content-disposition", "")
+        assert response.content[:4] == b"PK\x03\x04"
     finally:
         app.dependency_overrides.pop(_get_storage, None)
 

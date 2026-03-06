@@ -198,15 +198,16 @@
           v-else-if="exportStatus === 'done' && exportDownloadUrl"
           class="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3"
         >
-          <a
-            :href="exportDownloadUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label="Скачать ZIP (откроется в новой вкладке)"
-            class="text-primary font-medium underline transition-colors hover:text-primary/90"
+          <button
+            type="button"
+            class="text-primary font-medium underline transition-colors hover:text-primary/90 disabled:opacity-50 disabled:no-underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+            :disabled="exportDownloading"
+            :aria-busy="exportDownloading"
+            :aria-label="exportDownloading ? 'Скачивание…' : 'Скачать ZIP'"
+            @click="downloadExportZip"
           >
-            Скачать ZIP
-          </a>
+            {{ exportDownloading ? 'Скачивание…' : 'Скачать ZIP' }}
+          </button>
         </div>
         <div
           v-else-if="exportStatus === 'done' && !exportDownloadUrl"
@@ -603,6 +604,9 @@ const exportId = ref<string | null>(null);
 const exportStatus = ref<ExportResponse["status"] | null>(null);
 const exportDownloadUrl = ref<string | null>(null);
 const exportError = ref<string | null>(null);
+const exportDownloading = ref(false);
+
+const toast = useToast();
 
 const designSheetOpen = ref(false);
 const settingsButtonRef = ref<HTMLButtonElement | null>(null);
@@ -1067,6 +1071,7 @@ function startExportSSE() {
   };
 
   es.onerror = () => {
+    if (!exportEventSource) return;
     exportStatus.value = "failed";
     closeExportSSE();
   };
@@ -1086,6 +1091,41 @@ async function startExport() {
   } catch {
     exportStatus.value = null;
     // useApi shows toast
+  }
+}
+
+async function downloadExportZip() {
+  const url = exportDownloadUrl.value;
+  if (!url || exportDownloading.value) return;
+  const fetchUrl = url.startsWith("http") ? url : `${_sseBaseUrl}${url.startsWith("/") ? url : `/${url}`}`;
+  exportDownloading.value = true;
+  const controller = new AbortController();
+  let objectUrl: string | null = null;
+  const headers: Record<string, string> = {};
+  if (_sseApiKey) headers["X-API-Key"] = _sseApiKey;
+  try {
+    const response = await fetch(fetchUrl, { signal: controller.signal, headers });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const blob = await response.blob();
+    objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = objectUrl;
+    a.download = `carousel-${id.value}.zip`;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  } catch {
+    toast.showError("Не удалось скачать ZIP. Проверьте соединение.");
+  } finally {
+    controller.abort();
+    if (objectUrl) {
+      const urlToRevoke = objectUrl;
+      setTimeout(() => URL.revokeObjectURL(urlToRevoke), 100);
+    }
+    exportDownloading.value = false;
   }
 }
 

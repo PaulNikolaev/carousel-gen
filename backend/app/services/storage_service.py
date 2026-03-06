@@ -80,6 +80,12 @@ def _sync_generate_presigned_url(
     )
 
 
+def _sync_get_object_bytes(client, bucket: str, key: str) -> bytes:
+    """Read object from S3 and return bytes."""
+    response = client.get_object(Bucket=bucket, Key=key)
+    return response["Body"].read()
+
+
 def _public_url(bucket: str, key: str) -> str | None:
     base = get_settings().S3_PUBLIC_BASE_URL.strip()
     if not base:
@@ -145,3 +151,12 @@ class StorageService:
         return await asyncio.to_thread(
             _sync_generate_presigned_url, self._client, b, key, expires_in
         )
+
+    async def get_object_bytes(
+        self,
+        key: str,
+        bucket: str | None = None,
+    ) -> bytes:
+        """Read object from S3 and return bytes. Raises ClientError if not found."""
+        b = bucket or self._bucket
+        return await asyncio.to_thread(_sync_get_object_bytes, self._client, b, key)
