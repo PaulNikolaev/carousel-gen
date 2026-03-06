@@ -1,4 +1,8 @@
-"""Middleware: require X-API-Key header when API_KEY is set. Health path is excluded."""
+"""Middleware: require X-API-Key header when API_KEY is set. Health path is excluded.
+
+Note: when using the api_key query parameter, the key may appear in server/proxy access logs;
+prefer the X-API-Key header when possible.
+"""
 
 import hmac
 
@@ -16,23 +20,28 @@ def _is_health_path(path: str) -> bool:
 
 
 class APIKeyMiddleware(BaseHTTPMiddleware):
-    """If settings.API_KEY is set, require X-API-Key header; skip for health path."""
+    """If settings.API_KEY is set, require X-API-Key header (or api_key query param for SSE/EventSource); skip for health path."""
 
     async def dispatch(self, request: Request, call_next):
         if request.method == "OPTIONS":
             return await call_next(request)
 
         settings = get_settings()
-        if not settings.API_KEY.get_secret_value():
+        expected = settings.API_KEY.get_secret_value()
+        if not expected:
             return await call_next(request)
 
         if _is_health_path(request.url.path):
             return await call_next(request)
 
-        provided = request.headers.get("X-API-Key")
-
-        if provided and hmac.compare_digest(provided, settings.API_KEY.get_secret_value()):
-            return await call_next(request)
+        provided_header = request.headers.get("X-API-Key")
+        if provided_header:
+            if hmac.compare_digest(provided_header, expected):
+                return await call_next(request)
+        else:
+            provided_query = request.query_params.get("api_key")
+            if provided_query and hmac.compare_digest(provided_query, expected):
+                return await call_next(request)
 
         return JSONResponse(
             status_code=401,
